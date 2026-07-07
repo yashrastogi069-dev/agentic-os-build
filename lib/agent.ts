@@ -7,6 +7,9 @@ import { getChatSettings } from "@/lib/settings"
 import { OLLAMA_URL, OLLAMA_CHAT_MODEL } from "@/lib/ollama"
 import { obsidianTools } from "@/lib/connectors/obsidian"
 import { githubTools } from "@/lib/connectors/github"
+import { telegramTools } from "@/lib/connectors/telegram"
+import { googleTools } from "@/lib/connectors/google"
+import { appleTools } from "@/lib/connectors/apple"
 import { getRecentEvents } from "@/lib/events"
 
 /**
@@ -148,6 +151,9 @@ Capabilities:
 - Long-term memory: saveMemory / recallMemory. Proactively recall context before answering personal questions; proactively save durable facts the user shares.
 - Obsidian vault: search, read, append, and create notes (when the connector is configured).
 - GitHub: notifications, PRs, issues, recent commits (when GITHUB_TOKEN is set).
+- Telegram: sendTelegram pushes messages to the user's phone; getTelegramMessages pulls new ones (when a bot token is configured).
+- Google: getCalendarEvents / getRecentEmails (when the user connects Google in Settings).
+- Apple Calendar: getAppleCalendarEvents via iCloud (when Apple ID + app password are configured).
 - Updates feed: merged events from all connectors; use it for briefings.
 - Skill Factory: saveAsSkill / listSkills / runSkill. When the user mentions doing something repeatedly, offer to save it as a skill.
 
@@ -167,6 +173,9 @@ export function createOsAgent() {
       ...skillTools,
       ...obsidianTools,
       ...githubTools,
+      ...telegramTools,
+      ...googleTools,
+      ...appleTools,
     },
     stopWhen: isStepCount(12),
   })

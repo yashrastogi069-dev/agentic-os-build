@@ -20,19 +20,11 @@ export default function Home() {
     <main className="flex h-dvh flex-col bg-background text-foreground">
       <StatusBar onOpenSettings={() => setRightTab('settings')} />
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-border lg:grid-cols-[minmax(0,5fr)_minmax(0,4fr)_minmax(0,4fr)]">
-        {/* Core stage — hidden on small screens to prioritize function */}
-        <section
-          aria-label="Core status"
-          className="hidden bg-background lg:block"
-        >
-          <CoreStage state={coreState} />
-        </section>
-
-        {/* Agent chat */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-border lg:grid-cols-[minmax(0,4fr)_minmax(0,5fr)_minmax(0,4fr)]">
+        {/* Agent chat — left column */}
         <section
           aria-label="Agent chat"
-          className="flex min-h-0 flex-col bg-background"
+          className="flex min-h-0 flex-col bg-background lg:order-1"
         >
           <header className="border-b border-border px-3 py-2">
             <h2 className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
@@ -42,10 +34,18 @@ export default function Home() {
           <ChatPanel onStateChange={setCoreState} />
         </section>
 
+        {/* Core stage — center, hidden on small screens to prioritize function */}
+        <section
+          aria-label="Core status"
+          className="hidden bg-background lg:order-2 lg:block"
+        >
+          <CoreStage state={coreState} />
+        </section>
+
         {/* Right column: feed / memory / settings */}
         <section
           aria-label="Panels"
-          className="flex min-h-0 flex-col bg-background"
+          className="flex min-h-0 flex-col bg-background lg:order-3"
         >
           <header className="flex border-b border-border">
             {(
