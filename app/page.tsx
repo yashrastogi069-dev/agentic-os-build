@@ -6,9 +6,10 @@ import { CoreStage, type CoreState } from '@/components/core-stage'
 import { ChatPanel } from '@/components/chat-panel'
 import { FeedPanel } from '@/components/feed-panel'
 import { MemoryPanel } from '@/components/memory-panel'
+import { NotesPanel } from '@/components/notes-panel'
 import { SettingsPanel } from '@/components/settings-panel'
 
-type RightTab = 'feed' | 'memory' | 'settings'
+type RightTab = 'feed' | 'notes' | 'memory' | 'settings'
 
 export default function Home() {
   const [coreState, setCoreState] = useState<CoreState>('idle')
@@ -49,6 +50,7 @@ export default function Home() {
             {(
               [
                 ['feed', 'feed'],
+                ['notes', 'notes'],
                 ['memory', 'memory'],
                 ['settings', 'settings'],
               ] as Array<[RightTab, string]>
@@ -70,6 +72,7 @@ export default function Home() {
           </header>
           <div className="min-h-0 flex-1">
             {rightTab === 'feed' && <FeedPanel />}
+            {rightTab === 'notes' && <NotesPanel />}
             {rightTab === 'memory' && <MemoryPanel />}
             {rightTab === 'settings' && <SettingsPanel />}
           </div>
