@@ -7,18 +7,26 @@ import {
   getObsidianSettings,
   DEFAULT_GROQ_MODEL,
 } from "@/lib/settings"
+import { getTelegramSettings } from "@/lib/connectors/telegram"
+import { getGoogleSettings, isGoogleConnected } from "@/lib/connectors/google"
+import { getAppleSettings } from "@/lib/connectors/apple"
 
 export const dynamic = "force-dynamic"
 
 /** GET /api/settings — current settings (MCP key included: single-user local app). */
 export async function GET() {
   const obsidian = getObsidianSettings()
+  const google = getGoogleSettings()
+  const apple = getAppleSettings()
   return NextResponse.json({
     chat: getChatSettings(),
     mcp: { key: getMcpKey() },
     obsidian: obsidian
       ? { configured: true, baseUrl: obsidian.baseUrl }
       : { configured: false, baseUrl: "http://127.0.0.1:27123" },
+    telegram: { configured: Boolean(getTelegramSettings()) },
+    google: { credentials: Boolean(google), connected: isGoogleConnected() },
+    apple: { configured: Boolean(apple), appleId: apple?.appleId ?? "" },
     defaults: { groqModel: DEFAULT_GROQ_MODEL },
   })
 }
@@ -36,6 +44,11 @@ export async function POST(request: Request) {
     groqModel?: string
     apiKey?: string
     baseUrl?: string
+    botToken?: string
+    clientId?: string
+    clientSecret?: string
+    appleId?: string
+    appPassword?: string
   }
 
   switch (body.action) {
