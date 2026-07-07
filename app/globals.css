@@ -54,7 +54,8 @@
   Palette (4 colors): near-black base, panel gray, cyan glow (primary),
   amber (warning). Text = off-white neutrals derived from base.
 */
-:root {
+:root,
+.dark {
   color-scheme: dark;
   --background: oklch(0.14 0.012 240);
   --foreground: oklch(0.9 0.008 210);

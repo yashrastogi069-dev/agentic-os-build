@@ -2,6 +2,7 @@ import { tool } from "ai"
 import { z } from "zod"
 import { getObsidianSettings } from "@/lib/settings"
 import { saveMemory } from "@/lib/memory"
+import { addEvent } from "@/lib/events"
 
 /**
  * Obsidian connector — server-side, first-class.
@@ -130,6 +131,33 @@ export async function indexVault(): Promise<{ files: number; memories: number; e
 
 function encodePath(notePath: string): string {
   return notePath.split("/").map(encodeURIComponent).join("/")
+}
+
+/**
+ * Feed sync — records a daily vault snapshot event (file count + reachability).
+ * The Local REST API has no modified-since endpoint, so per-note change events
+ * aren't available; the snapshot keeps the feed honest about vault status.
+ */
+export async function syncObsidianToFeed(): Promise<{ added: number }> {
+  const walk = async (dir: string): Promise<number> => {
+    const entries = await listVaultFiles(dir)
+    let count = 0
+    for (const entry of entries) {
+      const full = dir ? `${dir}/${entry}` : entry
+      if (entry.endsWith("/")) count += await walk(full.slice(0, -1))
+      else if (entry.endsWith(".md")) count++
+    }
+    return count
+  }
+  const noteCount = await walk("")
+  const day = new Date().toISOString().slice(0, 10)
+  const added = addEvent({
+    source: "obsidian",
+    title: `Vault online — ${noteCount} notes`,
+    payload: { kind: "vault-snapshot", noteCount },
+    externalId: `vault-snapshot-${day}`,
+  })
+  return { added: added ? 1 : 0 }
 }
 
 /* ---------- Agent tools ---------- */
