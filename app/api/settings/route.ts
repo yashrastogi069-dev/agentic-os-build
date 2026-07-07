@@ -70,6 +70,45 @@ export async function POST(request: Request) {
       })
       return NextResponse.json({ ok: true })
     }
+    case "setTelegram": {
+      if (!body.botToken?.trim()) {
+        return NextResponse.json({ error: "botToken is required" }, { status: 400 })
+      }
+      setConnectorConfig("telegram", { botToken: body.botToken.trim() })
+      return NextResponse.json({ ok: true })
+    }
+    case "setGoogleCredentials": {
+      if (!body.clientId?.trim() || !body.clientSecret?.trim()) {
+        return NextResponse.json(
+          { error: "clientId and clientSecret are required" },
+          { status: 400 },
+        )
+      }
+      // Preserve an existing refresh token unless the client id changed.
+      const existing = getGoogleSettings()
+      const sameClient = existing?.clientId === body.clientId.trim()
+      setConnectorConfig("google", {
+        clientId: body.clientId.trim(),
+        clientSecret: body.clientSecret.trim(),
+        ...(sameClient && existing?.refreshToken
+          ? { refreshToken: existing.refreshToken }
+          : {}),
+      })
+      return NextResponse.json({ ok: true })
+    }
+    case "setApple": {
+      if (!body.appleId?.trim() || !body.appPassword?.trim()) {
+        return NextResponse.json(
+          { error: "appleId and appPassword are required" },
+          { status: 400 },
+        )
+      }
+      setConnectorConfig("apple", {
+        appleId: body.appleId.trim(),
+        appPassword: body.appPassword.trim(),
+      })
+      return NextResponse.json({ ok: true })
+    }
     case "regenerateMcpKey": {
       const key = regenerateMcpKey()
       return NextResponse.json({ ok: true, key })

@@ -42,23 +42,67 @@ export function SkillsPanel() {
   const { data, error, mutate } = useSWR<{ skills: SkillItem[] }>('/api/skills', fetcher)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [discovering, setDiscovering] = useState(false)
+  const [discoverMessage, setDiscoverMessage] = useState('')
 
   const skills = data?.skills ?? []
 
+  async function discover() {
+    setDiscovering(true)
+    setDiscoverMessage('')
+    try {
+      const res = await fetch('/api/skills/discover', { method: 'POST' })
+      const json = (await res.json()) as {
+        created?: Array<{ name: string }>
+        reason?: string
+        error?: string
+      }
+      if (!res.ok) throw new Error(json.error ?? 'discovery failed')
+      setDiscoverMessage(
+        json.created && json.created.length > 0
+          ? `found: ${json.created.map((c) => c.name).join(', ')} — review the candidates below`
+          : (json.reason ?? 'no new patterns'),
+      )
+      mutate()
+    } catch (err) {
+      setDiscoverMessage(err instanceof Error ? err.message : 'discovery failed')
+    } finally {
+      setDiscovering(false)
+    }
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto p-3">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
           skill factory · loop engine
         </span>
-        <button
-          type="button"
-          onClick={() => setShowCreate((v) => !v)}
-          className="rounded-sm border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-        >
-          {showCreate ? 'close' : '+ new skill'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={discovering}
+            title="Analyze your usage history for repeated tasks"
+            onClick={discover}
+            className="rounded-sm border border-accent/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-accent transition-colors hover:bg-accent/10 disabled:opacity-40"
+          >
+            {discovering ? 'analyzing…' : 'discover'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCreate((v) => !v)}
+            className="rounded-sm border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            {showCreate ? 'close' : '+ new skill'}
+          </button>
+        </div>
       </div>
+
+      {discoverMessage && (
+        <p className="mb-2 font-mono text-[10px] leading-relaxed text-accent">
+          {'> '}
+          {discoverMessage}
+        </p>
+      )}
 
       {showCreate && (
         <CreateSkillForm
@@ -254,6 +298,23 @@ function SkillDetail({ skill, onChanged }: { skill: SkillItem; onChanged: () => 
 
       {/* Loop Engine actions */}
       <div className="flex flex-wrap items-center gap-2">
+        {skill.status === 'candidate' && (
+          <button
+            type="button"
+            disabled={busyAction !== ''}
+            title="Promote this discovered candidate to a built skill"
+            onClick={async () => {
+              const result = await act('approve')
+              if (result) {
+                setMessage('candidate approved — skill is now built')
+                onChanged()
+              }
+            }}
+            className="rounded-sm border border-success/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-success transition-colors hover:bg-success/10 disabled:opacity-40"
+          >
+            {busyAction === 'approve' ? 'approving…' : 'approve candidate'}
+          </button>
+        )}
         <button
           type="button"
           disabled={busyAction !== '' || skill.health.down === 0}

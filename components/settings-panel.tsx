@@ -9,6 +9,9 @@ type Settings = {
   chat: { brain: 'groq' | 'ollama'; groqModel: string }
   mcp: { key: string }
   obsidian: { configured: boolean; baseUrl: string }
+  telegram: { configured: boolean }
+  google: { credentials: boolean; connected: boolean }
+  apple: { configured: boolean; appleId: string }
   defaults: { groqModel: string }
 }
 
@@ -25,6 +28,11 @@ async function postSettings(body: Record<string, unknown>) {
 export function SettingsPanel() {
   const { data } = useSWR<Settings>('/api/settings', fetcher)
   const [obsidianKey, setObsidianKey] = useState('')
+  const [telegramToken, setTelegramToken] = useState('')
+  const [googleClientId, setGoogleClientId] = useState('')
+  const [googleClientSecret, setGoogleClientSecret] = useState('')
+  const [appleId, setAppleId] = useState('')
+  const [applePassword, setApplePassword] = useState('')
   const [showMcpKey, setShowMcpKey] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -135,6 +143,160 @@ export function SettingsPanel() {
         )}
       </section>
 
+      {/* Telegram */}
+      <section>
+        <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          telegram bot
+        </h3>
+        {data.telegram.configured ? (
+          <p className="font-mono text-xs text-primary">bot token configured</p>
+        ) : (
+          <form
+            className="flex gap-2"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!telegramToken.trim()) return
+              await postSettings({ action: 'setTelegram', botToken: telegramToken.trim() })
+              setTelegramToken('')
+              setStatusLine('telegram bot saved — message your bot, then sync feeds')
+            }}
+          >
+            <input
+              type="password"
+              value={telegramToken}
+              onChange={(e) => setTelegramToken(e.target.value)}
+              placeholder="bot token from @BotFather"
+              aria-label="Telegram bot token"
+              className="flex-1 rounded-sm border border-border bg-transparent px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
+            />
+            <button
+              type="submit"
+              className="rounded-sm border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-xs uppercase text-primary hover:bg-primary/20"
+            >
+              save
+            </button>
+          </form>
+        )}
+      </section>
+
+      {/* Google */}
+      <section>
+        <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          google calendar + gmail
+        </h3>
+        {data.google.connected ? (
+          <p className="font-mono text-xs text-primary">connected (read-only)</p>
+        ) : data.google.credentials ? (
+          <a
+            href="/api/google/auth"
+            className="block w-full rounded-sm border border-primary/40 bg-primary/10 px-3 py-2 text-center font-mono text-xs uppercase tracking-widest text-primary transition-colors hover:bg-primary/20"
+          >
+            connect google account
+          </a>
+        ) : (
+          <form
+            className="space-y-2"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!googleClientId.trim() || !googleClientSecret.trim()) return
+              await postSettings({
+                action: 'setGoogleCredentials',
+                clientId: googleClientId.trim(),
+                clientSecret: googleClientSecret.trim(),
+              })
+              setGoogleClientId('')
+              setGoogleClientSecret('')
+              setStatusLine('google credentials saved — now click connect')
+            }}
+          >
+            <input
+              type="text"
+              value={googleClientId}
+              onChange={(e) => setGoogleClientId(e.target.value)}
+              placeholder="OAuth client ID"
+              aria-label="Google OAuth client ID"
+              className="w-full rounded-sm border border-border bg-transparent px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
+            />
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={googleClientSecret}
+                onChange={(e) => setGoogleClientSecret(e.target.value)}
+                placeholder="OAuth client secret"
+                aria-label="Google OAuth client secret"
+                className="flex-1 rounded-sm border border-border bg-transparent px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
+              />
+              <button
+                type="submit"
+                className="rounded-sm border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-xs uppercase text-primary hover:bg-primary/20"
+              >
+                save
+              </button>
+            </div>
+            <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+              create a Web OAuth client in Google Cloud Console with redirect URI
+              http://localhost:3000/api/google/callback
+            </p>
+          </form>
+        )}
+      </section>
+
+      {/* Apple Calendar */}
+      <section>
+        <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          apple calendar (icloud)
+        </h3>
+        {data.apple.configured ? (
+          <p className="font-mono text-xs text-primary">
+            configured as {data.apple.appleId}
+          </p>
+        ) : (
+          <form
+            className="space-y-2"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!appleId.trim() || !applePassword.trim()) return
+              await postSettings({
+                action: 'setApple',
+                appleId: appleId.trim(),
+                appPassword: applePassword.trim(),
+              })
+              setAppleId('')
+              setApplePassword('')
+              setStatusLine('apple calendar saved — sync feeds to pull events')
+            }}
+          >
+            <input
+              type="email"
+              value={appleId}
+              onChange={(e) => setAppleId(e.target.value)}
+              placeholder="Apple ID email"
+              aria-label="Apple ID email"
+              className="w-full rounded-sm border border-border bg-transparent px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
+            />
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={applePassword}
+                onChange={(e) => setApplePassword(e.target.value)}
+                placeholder="app-specific password"
+                aria-label="Apple app-specific password"
+                className="flex-1 rounded-sm border border-border bg-transparent px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
+              />
+              <button
+                type="submit"
+                className="rounded-sm border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-xs uppercase text-primary hover:bg-primary/20"
+              >
+                save
+              </button>
+            </div>
+            <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+              generate an app-specific password at appleid.apple.com → security
+            </p>
+          </form>
+        )}
+      </section>
+
       {/* Connector sync */}
       <section>
         <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
@@ -145,17 +307,24 @@ export function SettingsPanel() {
           disabled={syncing}
           onClick={async () => {
             setSyncing(true)
-            setStatusLine('syncing github + obsidian…')
+            setStatusLine('syncing all connectors…')
             const res = await fetch('/api/feed', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({}),
             })
             const json = (await res.json()) as {
-              results: Record<string, { added?: number; error?: string }>
+              results: Record<
+                string,
+                { added?: number; error?: string; skipped?: boolean }
+              >
             }
             const lines = Object.entries(json.results).map(([source, r]) =>
-              r.error ? `${source}: ${r.error}` : `${source}: +${r.added} events`,
+              r.error
+                ? `${source}: ${r.error}`
+                : r.skipped
+                  ? `${source}: not configured`
+                  : `${source}: +${r.added} events`,
             )
             setStatusLine(lines.join(' · '))
             setSyncing(false)
