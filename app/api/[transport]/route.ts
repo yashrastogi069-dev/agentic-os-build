@@ -126,28 +126,86 @@ const handler = createMcpHandler(
       },
     )
 
-    // Stubs — implemented by the Skill Factory phase.
     server.registerTool(
       "list_skills",
       {
         title: "List Skills",
-        description: "List skills created by the Skill Factory. (Not built yet — later phase.)",
+        description:
+          "List skills created by the Skill Factory, with status, version, run health, and deploy target.",
         inputSchema: {},
       },
-      async () => ({
-        content: [{ type: "text", text: "Skill Factory not built yet (planned phase 6). No skills exist." }],
-      }),
+      async () => {
+        const { listSkills, skillHealth } = await import("@/lib/skills")
+        const items = listSkills().map((s) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          status: s.status,
+          version: s.version,
+          deployedTo: s.deployedTo,
+          health: skillHealth(s.id),
+        }))
+        return { content: [{ type: "text", text: JSON.stringify(items, null, 2) }] }
+      },
     )
     server.registerTool(
       "run_skill",
       {
         title: "Run Skill",
-        description: "Run a skill by name. (Not built yet — later phase.)",
-        inputSchema: { name: z.string() },
+        description:
+          "Execute a skill by name with the given input. The run is logged for the Loop Engine.",
+        inputSchema: { name: z.string(), input: z.string() },
       },
-      async ({ name }) => ({
-        content: [{ type: "text", text: `Skill Factory not built yet — cannot run "${name}".` }],
-      }),
+      async ({ name, input }) => {
+        const { runSkill } = await import("@/lib/skills")
+        const { run } = await runSkill(name, input)
+        return {
+          content: [{ type: "text", text: JSON.stringify({ runId: run.id, output: run.output }, null, 2) }],
+        }
+      },
+    )
+    server.registerTool(
+      "create_skill",
+      {
+        title: "Create Skill",
+        description:
+          "Create a new skill in the Skill Factory from a repeated task. Provide kebab-case name, one-line description, and complete step-by-step instructions.",
+        inputSchema: {
+          name: z.string(),
+          description: z.string(),
+          instructions: z.string(),
+        },
+      },
+      async ({ name, description, instructions }) => {
+        const { createSkill } = await import("@/lib/skills")
+        const skill = createSkill({ name, description, instructions, sourceTask: "claude-code" })
+        return {
+          content: [
+            { type: "text", text: `Created skill "${skill.name}" (id ${skill.id}, v${skill.version}).` },
+          ],
+        }
+      },
+    )
+    server.registerTool(
+      "get_skill_runs",
+      {
+        title: "Get Skill Runs",
+        description: "Recent runs for a skill (input, output, rating) — the Loop Engine's history.",
+        inputSchema: { skillId: z.number().int() },
+      },
+      async ({ skillId }) => {
+        const { listRuns } = await import("@/lib/skills")
+        const runs = listRuns(skillId).map((r) => ({
+          id: r.id,
+          version: r.skillVersion,
+          input: r.input.slice(0, 300),
+          output: r.output.slice(0, 500),
+          rating: r.rating,
+          feedback: r.feedback,
+          createdAt: new Date(r.createdAt).toISOString(),
+        }))
+        return { content: [{ type: "text", text: JSON.stringify(runs, null, 2) }] }
+      },
     )
   },
   {},

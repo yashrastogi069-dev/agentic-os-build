@@ -94,6 +94,54 @@ const feedTools = {
   }),
 }
 
+const skillTools = {
+  saveAsSkill: tool({
+    description:
+      "Turn a repeated task into a reusable skill. Use when the user says 'save this as a skill', 'automate this', or describes a task they do repeatedly. Write clear step-by-step instructions for performing the task.",
+    inputSchema: z.object({
+      name: z.string().describe("Short kebab-case skill name, e.g. 'pr-summary'."),
+      description: z.string().describe("One-sentence description of what the skill does."),
+      instructions: z
+        .string()
+        .describe("Complete step-by-step instructions for performing the task, written for an AI agent."),
+    }),
+    execute: async ({ name, description, instructions }) => {
+      const { createSkill } = await import("@/lib/skills")
+      const skill = createSkill({ name, description, instructions, sourceTask: "chat" })
+      return { created: true, id: skill.id, name: skill.name, version: skill.version }
+    },
+  }),
+  listSkills: tool({
+    description: "List all skills in the Skill Factory with their status and version.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      const { listSkills } = await import("@/lib/skills")
+      return {
+        skills: listSkills().map((s) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          status: s.status,
+          version: s.version,
+          deployedTo: s.deployedTo,
+        })),
+      }
+    },
+  }),
+  runSkill: tool({
+    description: "Execute a skill by name with the given input, and log the run for the Loop Engine.",
+    inputSchema: z.object({
+      name: z.string().describe("The skill name."),
+      input: z.string().describe("The input/task for this skill run."),
+    }),
+    execute: async ({ name, input }) => {
+      const { runSkill } = await import("@/lib/skills")
+      const { run } = await runSkill(name, input)
+      return { runId: run.id, output: run.output }
+    },
+  }),
+}
+
 const INSTRUCTIONS = `You are Agentic OS — a personal AI operating system running locally on the user's machine.
 
 Capabilities:
@@ -101,6 +149,7 @@ Capabilities:
 - Obsidian vault: search, read, append, and create notes (when the connector is configured).
 - GitHub: notifications, PRs, issues, recent commits (when GITHUB_TOKEN is set).
 - Updates feed: merged events from all connectors; use it for briefings.
+- Skill Factory: saveAsSkill / listSkills / runSkill. When the user mentions doing something repeatedly, offer to save it as a skill.
 
 Behavior:
 - Be concise and direct. This is an OS console, not a chatty assistant.
@@ -115,6 +164,7 @@ export function createOsAgent() {
     tools: {
       ...memoryTools,
       ...feedTools,
+      ...skillTools,
       ...obsidianTools,
       ...githubTools,
     },

@@ -1,42 +1,39 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useHealth } from '@/components/status-bar'
 
 export type CoreState = 'idle' | 'listening' | 'thinking' | 'speaking'
 
+// The 3D neural core is client-only (WebGL) — load it lazily with a fallback.
+const NeuralCore = dynamic(
+  () => import('@/components/neural-core').then((mod) => mod.NeuralCore),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center">
+        <p className="animate-pulse font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+          initializing neural core…
+        </p>
+      </div>
+    ),
+  },
+)
+
 /**
- * Center stage — placeholder for the future 3D neural core (r3f, later phase).
- * A pulsing ring system that reacts to the agent state, plus live OS stats.
+ * Center stage — the movable glowing 3D neural network.
+ * Drag to rotate, scroll to zoom. Reacts to agent state (idle/listening/thinking/speaking).
  */
 export function CoreStage({ state }: { state: CoreState }) {
   const { data } = useHealth()
 
-  const stateColor =
-    state === 'thinking'
-      ? 'border-warning/60'
-      : state === 'listening' || state === 'speaking'
-        ? 'border-primary/80'
-        : 'border-primary/35'
-
   return (
-    <div className="relative flex h-full min-h-48 flex-col items-center justify-center gap-6 overflow-hidden">
-      <div className="relative flex items-center justify-center" aria-hidden="true">
-        <div
-          className={`animate-core-pulse absolute size-44 rounded-full border ${stateColor}`}
-          style={{ animationDelay: '0s' }}
-        />
-        <div
-          className={`animate-core-pulse absolute size-32 rounded-full border ${stateColor}`}
-          style={{ animationDelay: '0.5s' }}
-        />
-        <div
-          className={`animate-core-pulse absolute size-20 rounded-full border ${stateColor}`}
-          style={{ animationDelay: '1s' }}
-        />
-        <div className="glow-primary size-10 rounded-full bg-primary/20 ring-1 ring-primary/60" />
+    <div className="relative flex h-full min-h-48 flex-col overflow-hidden">
+      <div className="absolute inset-0">
+        <NeuralCore state={state} />
       </div>
 
-      <div className="z-10 flex flex-col items-center gap-1 pt-40">
+      <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex flex-col items-center gap-1">
         <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
           core // {state}
         </p>

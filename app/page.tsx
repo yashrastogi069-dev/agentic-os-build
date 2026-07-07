@@ -7,9 +7,10 @@ import { ChatPanel } from '@/components/chat-panel'
 import { FeedPanel } from '@/components/feed-panel'
 import { MemoryPanel } from '@/components/memory-panel'
 import { NotesPanel } from '@/components/notes-panel'
+import { SkillsPanel } from '@/components/skills-panel'
 import { SettingsPanel } from '@/components/settings-panel'
 
-type RightTab = 'feed' | 'notes' | 'memory' | 'settings'
+type RightTab = 'feed' | 'notes' | 'memory' | 'skills' | 'settings'
 
 export default function Home() {
   const [coreState, setCoreState] = useState<CoreState>('idle')
@@ -52,6 +53,7 @@ export default function Home() {
                 ['feed', 'feed'],
                 ['notes', 'notes'],
                 ['memory', 'memory'],
+                ['skills', 'skills'],
                 ['settings', 'settings'],
               ] as Array<[RightTab, string]>
             ).map(([tab, label]) => (
@@ -74,6 +76,7 @@ export default function Home() {
             {rightTab === 'feed' && <FeedPanel />}
             {rightTab === 'notes' && <NotesPanel />}
             {rightTab === 'memory' && <MemoryPanel />}
+            {rightTab === 'skills' && <SkillsPanel />}
             {rightTab === 'settings' && <SettingsPanel />}
           </div>
         </section>

@@ -56,9 +56,19 @@ Requires Obsidian running on the same machine.
 
 Add `GITHUB_TOKEN` to `.env.local` and restart. The agent can then read notifications, PRs, issues, and commits. Use **sync** in the feed panel to pull events.
 
+## Skill Factory + Loop Engine
+
+Turn repeated tasks into versioned, deployable skills (Skills tab, or tell the agent "save this as a skill").
+
+- **Create**: name + description + step-by-step instructions. The agent can create skills from chat; Claude Code can create them via MCP (`create_skill`).
+- **Run**: execute a skill with any input — runs via the OS brain (Groq/Ollama) and are logged to `skill_runs`.
+- **Rate**: mark each run good/bad (with optional feedback) from the run history.
+- **Refine**: once a skill has negative runs, click **refine** — the Loop Engine analyzes failures and proposes revised instructions. Apply to bump the version (v1 → v2 …).
+- **Deploy**: enter `owner/repo` and click **deploy → github** — commits `.claude/skills/<name>/SKILL.md` (Claude Code-compatible format) via the Contents API using your `GITHUB_TOKEN`. Re-deploy anytime after refinements.
+
 ## Claude Code integration (MCP)
 
-The OS is an MCP server at `http://localhost:3000/api/mcp`, exposing tools like `get_updates_feed`, `search_memory`, `save_memory`, and `get_status`.
+The OS is an MCP server at `http://localhost:3000/api/mcp`, exposing: `search_memory`, `save_memory`, `get_updates_feed`, `get_agent_status`, `list_skills`, `run_skill`, `create_skill`, and `get_skill_runs`.
 
 1. Open Settings tab → claude code / mcp.
 2. Click **copy claude setup command** and run it in your terminal:
@@ -79,19 +89,22 @@ app/
   api/voice/*         local STT (whisper.cpp) + TTS (Piper)
   api/feed            unified connector events + sync
   api/memories        memory CRUD + semantic recall
-  api/obsidian/index  vault -> memory indexing
+  api/obsidian/*      vault indexing + notes browse/search/read
+  api/skills/*        Skill Factory + Loop Engine (create/run/rate/refine/deploy)
   api/health          service probes for the status bar
 lib/
   db/                 SQLite + sqlite-vec bootstrap
   memory.ts           chunking, embeddings, vector + keyword recall
   agent.ts            ToolLoopAgent (Groq default, Ollama fallback)
+  skills.ts           Skill Factory + Loop Engine (SKILL.md export, GitHub deploy)
   connectors/         github.ts, obsidian.ts
   voice/              WAV recorder (client) + binary paths (server)
+components/
+  neural-core.tsx     3D neural network (drag to rotate, reacts to agent state)
 ```
 
 ## Roadmap (next phases)
 
-- 3D neural core (React Three Fiber) reacting to agent state
 - Telegram, Google Calendar/Gmail, Apple Calendar (CalDAV) connectors
-- Skill Factory: interview-driven discovery of repeated tasks → SKILL.md generation → GitHub deploy
-- Loop Engine: run scoring, versioned skill refinement, continuous discovery
+- Usage-pattern discovery: automatic detection of repeated tasks from OS usage
+- Cloudflare Tunnel + Access recipe for phone access

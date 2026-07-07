@@ -41,6 +41,44 @@ export const connectorSettings = sqliteTable("connector_settings", {
     .$defaultFn(() => new Date()),
 })
 
+/** Skill Factory: repeated tasks turned into reusable skills. */
+export const skills = sqliteTable("skills", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull().unique(),
+  description: text("description").notNull(),
+  /** The skill's system instructions — how to perform the task. */
+  instructions: text("instructions").notNull(),
+  /** Where this skill came from: 'manual', 'interview', 'usage-pattern'. */
+  sourceTask: text("source_task").notNull().default("manual"),
+  status: text("status").notNull().default("built"), // candidate | built | deployed | refining
+  version: integer("version").notNull().default(1),
+  /** Last GitHub deploy target, e.g. "owner/repo@.claude/skills/name". */
+  deployedTo: text("deployed_to"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
+/** Loop Engine: every skill execution, scored for the refine cycle. */
+export const skillRuns = sqliteTable("skill_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  skillId: integer("skill_id").notNull(),
+  skillVersion: integer("skill_version").notNull().default(1),
+  input: text("input").notNull(),
+  output: text("output").notNull(),
+  /** 1 = thumbs up, -1 = thumbs down, 0 = unrated. */
+  rating: integer("rating").notNull().default(0),
+  feedback: text("feedback"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
 export type Memory = typeof memories.$inferSelect
 export type Event = typeof events.$inferSelect
 export type ConnectorSetting = typeof connectorSettings.$inferSelect
+export type Skill = typeof skills.$inferSelect
+export type SkillRun = typeof skillRuns.$inferSelect

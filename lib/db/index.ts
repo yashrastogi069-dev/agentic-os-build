@@ -17,10 +17,17 @@ export const EMBEDDING_DIM = 768
 const DB_DIR = path.join(process.cwd(), "data")
 const DB_PATH = process.env.AGENTIC_OS_DB_PATH ?? path.join(DB_DIR, "agentic-os.db")
 
+/**
+ * Bump SCHEMA_VERSION whenever tables are added — the cached connection
+ * (surviving HMR via globalThis) re-runs the idempotent DDL on mismatch.
+ */
+const SCHEMA_VERSION = 2
+
 type GlobalWithDb = typeof globalThis & {
   __agenticOsDb?: Database.Database
   __agenticOsDrizzle?: BetterSQLite3Database<typeof schema>
   __agenticOsVecAvailable?: boolean
+  __agenticOsSchemaVersion?: number
 }
 
 const g = globalThis as GlobalWithDb
@@ -69,6 +76,30 @@ function initDb(): Database.Database {
       config_json TEXT NOT NULL,
       updated_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS skills (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL,
+      instructions TEXT NOT NULL,
+      source_task TEXT NOT NULL DEFAULT 'manual',
+      status TEXT NOT NULL DEFAULT 'built',
+      version INTEGER NOT NULL DEFAULT 1,
+      deployed_to TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS skill_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      skill_id INTEGER NOT NULL,
+      skill_version INTEGER NOT NULL DEFAULT 1,
+      input TEXT NOT NULL,
+      output TEXT NOT NULL,
+      rating INTEGER NOT NULL DEFAULT 0,
+      feedback TEXT,
+      created_at INTEGER NOT NULL
+    );
   `)
 
   if (vecAvailable) {
@@ -86,6 +117,18 @@ function initDb(): Database.Database {
 export function getRawDb(): Database.Database {
   if (!g.__agenticOsDb) {
     g.__agenticOsDb = initDb()
+    g.__agenticOsSchemaVersion = SCHEMA_VERSION
+  } else if (g.__agenticOsSchemaVersion !== SCHEMA_VERSION) {
+    // Schema changed since this connection was cached (HMR) — close and re-init
+    // so the idempotent DDL creates any new tables.
+    try {
+      g.__agenticOsDb.close()
+    } catch {
+      // already closed
+    }
+    g.__agenticOsDb = initDb()
+    g.__agenticOsDrizzle = undefined
+    g.__agenticOsSchemaVersion = SCHEMA_VERSION
   }
   return g.__agenticOsDb
 }
