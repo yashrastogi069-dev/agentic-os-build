@@ -43,8 +43,8 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     sources?: string[]
   }
-  const sources = body.sources ?? ["github", "obsidian"]
-  const results: Record<string, { added?: number; error?: string }> = {}
+  const sources = body.sources ?? ["github", "obsidian", "telegram", "google", "apple"]
+  const results: Record<string, { added?: number; error?: string; skipped?: boolean }> = {}
 
   if (sources.includes("github")) {
     try {
@@ -58,6 +58,31 @@ export async function POST(request: Request) {
       results.obsidian = await syncObsidianToFeed()
     } catch (error) {
       results.obsidian = { error: error instanceof Error ? error.message : "sync failed" }
+    }
+  }
+  if (sources.includes("telegram")) {
+    try {
+      results.telegram = getTelegramSettings()?.botToken
+        ? await syncTelegramToFeed()
+        : { skipped: true }
+    } catch (error) {
+      results.telegram = { error: error instanceof Error ? error.message : "sync failed" }
+    }
+  }
+  if (sources.includes("google")) {
+    try {
+      results.google = isGoogleConnected() ? await syncGoogleToFeed() : { skipped: true }
+    } catch (error) {
+      results.google = { error: error instanceof Error ? error.message : "sync failed" }
+    }
+  }
+  if (sources.includes("apple")) {
+    try {
+      const apple = getAppleSettings()
+      results.apple =
+        apple?.appleId && apple?.appPassword ? await syncAppleToFeed() : { skipped: true }
+    } catch (error) {
+      results.apple = { error: error instanceof Error ? error.message : "sync failed" }
     }
   }
 

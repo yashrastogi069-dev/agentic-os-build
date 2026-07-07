@@ -7,6 +7,7 @@ import {
   proposeRefinement,
   applyRefinement,
   deploySkillToGithub,
+  approveCandidate,
   getSkill,
   toSkillMd,
 } from "@/lib/skills"
@@ -67,6 +68,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
         const skill = applyRefinement(skillId, body.instructions)
         return NextResponse.json({ version: skill.version })
+      }
+      case "approve": {
+        const skill = approveCandidate(skillId)
+        return NextResponse.json({ status: skill.status })
       }
       case "deploy": {
         if (typeof body.repo !== "string" || !body.repo.trim()) {

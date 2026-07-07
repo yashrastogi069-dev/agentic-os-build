@@ -4,6 +4,9 @@ import { NextResponse } from "next/server"
 import { getRawDb, isVecAvailable } from "@/lib/db"
 import { ollamaIsUp, ollamaModels, EMBEDDING_MODEL, OLLAMA_CHAT_MODEL } from "@/lib/ollama"
 import { getObsidianSettings, getChatSettings, getMcpKey } from "@/lib/settings"
+import { getTelegramSettings } from "@/lib/connectors/telegram"
+import { isGoogleConnected, getGoogleSettings } from "@/lib/connectors/google"
+import { getAppleSettings } from "@/lib/connectors/apple"
 import { memoryStats } from "@/lib/memory"
 import { WHISPER_BIN, WHISPER_MODEL, PIPER_BIN, PIPER_VOICE } from "@/lib/voice/paths"
 
@@ -44,6 +47,14 @@ export async function GET() {
     groq: { configured: Boolean(process.env.GROQ_API_KEY) },
     github: { configured: Boolean(process.env.GITHUB_TOKEN) },
     obsidian,
+    telegram: { configured: Boolean(getTelegramSettings()?.botToken) },
+    google: {
+      credentials: Boolean(getGoogleSettings()),
+      connected: isGoogleConnected(),
+    },
+    apple: {
+      configured: Boolean(getAppleSettings()?.appleId && getAppleSettings()?.appPassword),
+    },
     voice: {
       whisper: fs.existsSync(WHISPER_BIN) && fs.existsSync(WHISPER_MODEL),
       piper: fs.existsSync(PIPER_BIN) && fs.existsSync(PIPER_VOICE),

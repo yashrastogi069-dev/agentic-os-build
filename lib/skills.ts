@@ -13,7 +13,7 @@ import { getChatModel } from "@/lib/agent"
  *   at .claude/skills/<name>/SKILL.md via the Contents API.
  */
 
-const { skills, skillRuns } = schema
+const { skills, skillRuns, agentRuns } = schema
 
 // ---------- CRUD ----------
 
@@ -166,6 +166,124 @@ export function applyRefinement(skillId: number, newInstructions: string) {
       status: "built",
       updatedAt: new Date(),
     })
+    .where(eq(skills.id, skillId))
+    .returning()
+    .get()
+}
+
+// ---------- Continuous discovery: usage observation -> skill candidates ----------
+
+/** Log a user request for the discovery loop. Failure-tolerant by design. */
+export function logAgentRun(userMessage: string) {
+  try {
+    const trimmed = userMessage.trim().slice(0, 2000)
+    if (!trimmed) return
+    getDb().insert(agentRuns).values({ userMessage: trimmed }).run()
+  } catch {
+    // observation must never break chat
+  }
+}
+
+export function usageStats() {
+  const row = getDb()
+    .select({
+      total: sql<number>`count(*)`,
+      unanalyzed: sql<number>`sum(case when analyzed = 0 then 1 else 0 end)`,
+    })
+    .from(agentRuns)
+    .get()
+  return { total: row?.total ?? 0, unanalyzed: row?.unanalyzed ?? 0 }
+}
+
+/**
+ * Discovery pass: cluster recent usage into repeated tasks and create skill
+ * candidates (status "candidate"). Existing skills are excluded so the loop
+ * only surfaces NEW automation opportunities. Marks runs analyzed.
+ */
+export async function discoverSkillCandidates() {
+  const db = getDb()
+  const runs = db
+    .select()
+    .from(agentRuns)
+    .orderBy(desc(agentRuns.createdAt))
+    .limit(200)
+    .all()
+
+  if (runs.length < 5) {
+    return {
+      created: [],
+      reason: `Not enough usage yet (${runs.length} logged requests, need at least 5).`,
+    }
+  }
+
+  const existing = listSkills().map((s) => `- ${s.name}: ${s.description}`)
+  const history = runs.map((r) => `- ${r.userMessage.slice(0, 200)}`).join("\n")
+
+  const { text } = await generateText({
+    model: getChatModel(),
+    system: `You find repeated tasks in a user's AI-assistant usage history and propose reusable skills.
+
+Rules:
+- Only propose a skill when the SAME kind of task appears 3+ times.
+- Never propose something covered by an existing skill.
+- Output STRICT JSON: an array (max 3) of {"name": kebab-case, "description": one sentence, "instructions": step-by-step instructions for an AI agent, "evidence": count}. Output [] if nothing repeats.`,
+    prompt: `## Existing skills (do not duplicate)\n${existing.length > 0 ? existing.join("\n") : "(none)"}\n\n## Usage history (most recent first)\n${history}`,
+  })
+
+  let proposals: Array<{
+    name: string
+    description: string
+    instructions: string
+    evidence?: number
+  }> = []
+  try {
+    const jsonStart = text.indexOf("[")
+    const jsonEnd = text.lastIndexOf("]")
+    if (jsonStart !== -1 && jsonEnd > jsonStart) {
+      proposals = JSON.parse(text.slice(jsonStart, jsonEnd + 1))
+    }
+  } catch {
+    return { created: [], reason: "Analyzer returned malformed output — try again." }
+  }
+
+  const created: Array<{ id: number; name: string }> = []
+  for (const p of proposals.slice(0, 3)) {
+    if (!p?.name || !p?.description || !p?.instructions) continue
+    if (getSkill(p.name)) continue
+    const skill = db
+      .insert(skills)
+      .values({
+        name: p.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .slice(0, 64),
+        description: p.description,
+        instructions: p.instructions,
+        sourceTask: "usage-pattern",
+        status: "candidate",
+      })
+      .returning()
+      .get()
+    created.push({ id: skill.id, name: skill.name })
+  }
+
+  db.update(agentRuns).set({ analyzed: 1 }).run()
+
+  return {
+    created,
+    reason:
+      created.length > 0
+        ? `Found ${created.length} repeated-task pattern(s) in ${runs.length} requests.`
+        : `No new repeated patterns in ${runs.length} requests.`,
+  }
+}
+
+/** Promote a discovered candidate to a real (built) skill. */
+export function approveCandidate(skillId: number) {
+  return getDb()
+    .update(skills)
+    .set({ status: "built", updatedAt: new Date() })
     .where(eq(skills.id, skillId))
     .returning()
     .get()

@@ -21,7 +21,7 @@ const DB_PATH = process.env.AGENTIC_OS_DB_PATH ?? path.join(DB_DIR, "agentic-os.
  * Bump SCHEMA_VERSION whenever tables are added — the cached connection
  * (surviving HMR via globalThis) re-runs the idempotent DDL on mismatch.
  */
-const SCHEMA_VERSION = 2
+const SCHEMA_VERSION = 3
 
 type GlobalWithDb = typeof globalThis & {
   __agenticOsDb?: Database.Database
@@ -98,6 +98,13 @@ function initDb(): Database.Database {
       output TEXT NOT NULL,
       rating INTEGER NOT NULL DEFAULT 0,
       feedback TEXT,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS agent_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_message TEXT NOT NULL,
+      analyzed INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL
     );
   `)

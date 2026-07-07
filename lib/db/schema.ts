@@ -77,8 +77,23 @@ export const skillRuns = sqliteTable("skill_runs", {
     .$defaultFn(() => new Date()),
 })
 
+/**
+ * Usage observation: every user request to the agent, logged for the
+ * continuous-discovery loop (repeated tasks -> skill candidates).
+ */
+export const agentRuns = sqliteTable("agent_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userMessage: text("user_message").notNull(),
+  /** Set once a discovery pass has considered this run. */
+  analyzed: integer("analyzed").notNull().default(0),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
 export type Memory = typeof memories.$inferSelect
 export type Event = typeof events.$inferSelect
 export type ConnectorSetting = typeof connectorSettings.$inferSelect
 export type Skill = typeof skills.$inferSelect
 export type SkillRun = typeof skillRuns.$inferSelect
+export type AgentRun = typeof agentRuns.$inferSelect
