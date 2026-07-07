@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import useSWR from 'swr'
+import { SEED_MEMORIES } from '@/lib/seed-data'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -18,12 +19,20 @@ export function MemoryPanel() {
   const [query, setQuery] = useState('')
   const [submitted, setSubmitted] = useState('')
 
-  const { data, isLoading } = useSWR<{ memories: Memory[] }>(
+  const { data, error, isLoading } = useSWR<{
+    memories: Memory[]
+    seeded?: boolean
+  }>(
     submitted
       ? `/api/memories?q=${encodeURIComponent(submitted)}`
       : '/api/memories',
     fetcher,
   )
+
+  // Honest fallback: if the API itself is unreachable, render seed data
+  // client-side — always with the disconnected badge.
+  const seeded = Boolean(error) || Boolean(data?.seeded)
+  const memories = error ? SEED_MEMORIES : (data?.memories ?? [])
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -50,19 +59,26 @@ export function MemoryPanel() {
       </form>
 
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
+        {seeded && (
+          <div className="flex justify-end">
+            <span className="rounded-sm border border-destructive/40 bg-destructive/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-destructive">
+              disconnected · seed data
+            </span>
+          </div>
+        )}
         {isLoading && (
           <p className="animate-pulse font-mono text-xs text-muted-foreground">
             recalling…
           </p>
         )}
-        {data?.memories?.length === 0 && (
+        {memories.length === 0 && !isLoading && (
           <p className="font-mono text-xs leading-relaxed text-muted-foreground">
             {'> memory bank empty.'}
             <br />
             {'> tell the agent something worth remembering.'}
           </p>
         )}
-        {data?.memories?.map((memory) => (
+        {memories.map((memory) => (
           <div
             key={memory.id}
             className="rounded-sm border border-border bg-card px-3 py-2"

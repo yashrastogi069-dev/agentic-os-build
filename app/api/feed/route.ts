@@ -2,25 +2,37 @@ import { NextResponse } from "next/server"
 import { getRecentEvents } from "@/lib/events"
 import { syncGithubToFeed } from "@/lib/connectors/github"
 import { syncObsidianToFeed } from "@/lib/connectors/obsidian"
+import { SEED_EVENTS } from "@/lib/seed-data"
 
 export const dynamic = "force-dynamic"
 
-/** GET /api/feed — recent unified events, mapped for the dashboard. */
+/**
+ * GET /api/feed — recent unified events, mapped for the dashboard.
+ * Falls back to clearly-labeled seed data (seeded: true) when the local DB
+ * is unreachable or no connector has ever written an event.
+ */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const source = searchParams.get("source") ?? undefined
-  const events = getRecentEvents(50, source).map((event) => {
-    const payload = event.payload ?? {}
-    return {
-      id: event.id,
-      source: event.source,
-      type: typeof payload.kind === "string" ? payload.kind : "event",
-      title: event.title,
-      url: typeof payload.url === "string" ? payload.url : null,
-      occurredAt: new Date(event.createdAt).toISOString(),
+  try {
+    const events = getRecentEvents(50, source).map((event) => {
+      const payload = event.payload ?? {}
+      return {
+        id: event.id,
+        source: event.source,
+        type: typeof payload.kind === "string" ? payload.kind : "event",
+        title: event.title,
+        url: typeof payload.url === "string" ? payload.url : null,
+        occurredAt: new Date(event.createdAt).toISOString(),
+      }
+    })
+    if (events.length === 0) {
+      return NextResponse.json({ events: SEED_EVENTS, seeded: true })
     }
-  })
-  return NextResponse.json({ events })
+    return NextResponse.json({ events, seeded: false })
+  } catch {
+    return NextResponse.json({ events: SEED_EVENTS, seeded: true })
+  }
 }
 
 /** POST /api/feed — trigger connector syncs. { sources?: ("github"|"obsidian")[] } */

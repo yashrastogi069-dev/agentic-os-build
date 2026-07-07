@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import useSWR from 'swr'
+import { SEED_EVENTS } from '@/lib/seed-data'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -29,12 +30,16 @@ function timeAgo(iso: string) {
 }
 
 export function FeedPanel() {
-  const { data, error, isLoading, mutate } = useSWR<{ events: FeedEvent[] }>(
-    '/api/feed',
-    fetcher,
-    { refreshInterval: 60_000 },
-  )
+  const { data, error, isLoading, mutate } = useSWR<{
+    events: FeedEvent[]
+    seeded?: boolean
+  }>('/api/feed', fetcher, { refreshInterval: 60_000 })
   const [syncing, setSyncing] = useState(false)
+
+  // Honest fallback: if the API itself is unreachable, render seed data
+  // client-side — always with the disconnected badge.
+  const seeded = Boolean(error) || Boolean(data?.seeded)
+  const events = error ? SEED_EVENTS : (data?.events ?? [])
 
   async function syncNow() {
     setSyncing(true)
@@ -56,6 +61,11 @@ export function FeedPanel() {
         <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
           unified events
         </span>
+        {seeded && (
+          <span className="rounded-sm border border-destructive/40 bg-destructive/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-destructive">
+            disconnected · seed data
+          </span>
+        )}
         <button
           type="button"
           onClick={syncNow}
@@ -70,10 +80,7 @@ export function FeedPanel() {
           syncing feeds…
         </p>
       )}
-      {error && (
-        <p className="font-mono text-xs text-destructive">feed unavailable</p>
-      )}
-      {data?.events?.length === 0 && (
+      {events.length === 0 && !isLoading && (
         <p className="font-mono text-xs leading-relaxed text-muted-foreground">
           {'> no events yet.'}
           <br />
@@ -81,7 +88,7 @@ export function FeedPanel() {
         </p>
       )}
       <ul className="space-y-2">
-        {data?.events?.map((event) => (
+        {events.map((event) => (
           <li
             key={event.id}
             className="rounded-sm border border-border bg-card px-3 py-2"
