@@ -1,12 +1,13 @@
 {
-  "name": "my-project",
+  "name": "jarvis",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/groq": "^4.0.5",
@@ -16,7 +17,6 @@
     "@modelcontextprotocol/sdk": "1.26.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
-    "@vercel/analytics": "1.6.1",
     "ai": "^7.0.16",
     "better-sqlite3": "^12.11.1",
     "class-variance-authority": "^0.7.1",
@@ -46,13 +46,5 @@
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "typescript": "5.7.3"
-  },
-  "pnpm": {
-    "overrides": {
-      "hono": "4.12.25"
-    },
-    "onlyBuiltDependencies": [
-      "better-sqlite3"
-    ]
   }
 }
