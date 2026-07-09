@@ -5,152 +5,88 @@ before starting any new work on this project.
 
 ## Current Phase
 
-**Phase 0 — Foundation & hygiene: COMPLETE.** All gates pass (see below).
+**Phase 1 — Brain rewire + research chain: COMPLETE** (2026-07-09).
+Next executor starts **Phase 2 — Design system: Arc Reactor identity** per
+`tasks/PLAN.md` section 3. Yash's standing instruction (2026-07-09): run the
+next phases back-to-back with Opus (high) executors and batch the deep
+review/verification passes after 2-3 phases instead of per-phase.
 
-Next executor should start Phase 1 (Brain rewire + research chain) per
-`tasks/PLAN.md` section 3.
+## Phase 1 — what shipped
 
-## Phase Gate Results (actual command output, 2026-07-08)
+- `lib/providers.ts` (new): failsafe chain **Gemini 2.5 Flash → Groq Llama 3.3
+  70B → OpenRouter free → NVIDIA NIM → Ollama**. Per-provider cooldowns (60s on
+  5xx/network, 10min on 429/quota), `FORCE_DISABLE_PROVIDERS` env test hook,
+  OpenRouter free-model rotation (`meta-llama/llama-3.3-70b-instruct:free`,
+  `qwen/qwen3-next-80b-a3b-instruct:free`, `openai/gpt-oss-120b:free` — all
+  verified tool-capable via the live /models API on 2026-07-09),
+  `getProviderStatus()` for health/settings.
+- `lib/agent.ts`: `getChatModel()` → `resolveModel()`; new
+  `streamOsAgentResponse()` fails over to the next provider when a stream dies
+  BEFORE the first content token (after that, errors surface honestly); active
+  brain emitted as a transient `data-brain` UI part.
+- `lib/research.ts` (new): `webSearch` (Tavily → Serper) + `fetchPage`
+  (Firecrawl, 15s timeout) added to the agent toolset; failures degrade to an
+  error string the model relays honestly.
+- `app/api/chat`: zod validation, 50-message history cap, honest 400/500 JSON.
+- `/api/health`: `brain: { active, chain[] }`; status bar shows `brain: <id>`;
+  settings panel brain section = live chain status (active/standby/cooling/
+  no-key). Old groq/ollama picker replaced (chain is auto-routed).
+- Timestamps unified to ms (`mode: "timestamp_ms"` everywhere) +
+  `scripts/normalize-timestamps.mjs` (idempotent, backs up DB first).
+- `lib/skills.ts` analyzed-flag update scoped with `inArray` (was a blanket
+  UPDATE).
+- `.env.example` rewritten (all Phase 1 vars, FORCE_DISABLE_PROVIDERS
+  documented; stale Exa/Jina comment removed).
+- Deps: `@ai-sdk/google@4.0.10`, `@openrouter/ai-sdk-provider@3.0.0`.
 
-- `pnpm typecheck` (`tsc --noEmit`, with `ignoreBuildErrors` removed from
-  `next.config.mjs`): **exit 0**, no errors.
-- `pnpm build` (Turbopack): **succeeded**. No workspace-root warning (fixed by
-  `turbopack: { root: import.meta.dirname }`). Route manifest generated
-  cleanly (`/`, `/api/*` all present, `(app)` static + 15 dynamic API routes).
-- Dev server on port 3100 (`node_modules/.bin/next dev -p 3100`): ready in
-  2.4s. `curl -s localhost:3100/api/health` returned:
-  ```json
-  {
-    "db": { "ok": true, "vec": true, "memories": { "total": 0, "byCategory": {} } },
-    "ollama": {
-      "ok": true,
-      "embeddingModel": { "name": "nomic-embed-text", "pulled": true },
-      "chatModel": { "name": "llama3.2:3b", "pulled": false }
-    },
-    "groq": { "configured": false },
-    "github": { "configured": false },
-    "chat": { "brain": "groq", "groqModel": "llama-3.3-70b-versatile" }
-  }
-  ```
-  `db.ok=true`, `db.vec=true`, `ollama.ok=true` — all Phase 0 gate criteria met.
-  Server was killed after the check (PIDs for `next dev -p 3100` terminated,
-  confirmed via a follow-up `curl` connection-refused).
-- `git status`: only intended files touched (`.env.example`, `.gitignore`,
-  `app/layout.tsx`, `next.config.mjs`, `package.json`, `pnpm-lock.yaml`,
-  `pnpm-workspace.yaml`, `tsconfig.tsbuildinfo` deletion, `tasks/` new).
-  `.env.local` confirmed absent from `git status` and from `git diff`
-  (verified gitignored via `git check-ignore -v .env.local` →
-  `.gitignore:10:.env*.local`).
+## Phase 1 gate results (live, 2026-07-09, dev on :3100)
 
-## Task Checklist (plan section 3, Phase 0)
+- `pnpm typecheck` exit 0; `pnpm build` succeeded (all routes generated).
+- `/api/health` → `db.ok=true, vec=true, ollama.ok=true`, brain.active=gemini,
+  chain gemini=active | groq=ready | openrouter=ready | nvidia=ready |
+  ollama=ready.
+- Plain chat probe: streamed from **gemini** (data-brain part present).
+- "remember that my favorite color is arc reactor blue" → `saveMemory` tool
+  call streamed → GET `/api/memories?q=arc reactor` returned row id 1,
+  category=preference, semantic similarity 0.55, createdAt rendered as a sane
+  2026 ISO date (ms timestamps confirmed end-to-end).
+- webSearch probe: `webSearch` tool fired on gemini, returned live Tavily
+  results; model answered with the current Next.js version from them.
+- Failover: restart with `FORCE_DISABLE_PROVIDERS=gemini` → health showed
+  gemini=down, **active=groq**. (The failover chat-turn stream capture was cut
+  short: Yash ordered verification stopped mid-probe to keep momentum; the
+  chain-resolution proof above is the recorded evidence. Re-run the streamed
+  failover turn in the batched review pass.)
+- Timestamp script run against the real DB: backup
+  `data/backup-pre-ts-20260709.db` written; 0 legacy rows (fresh DB) — no-op
+  path verified.
+- `git status` clean of secrets; `.env.local` untouched/ignored.
 
-1. `.env.local` provisioned from `C:\Users\win 10\Desktop\keys.evn` — Gemini,
-   OpenRouter, NVIDIA, Tavily, Serper (trimmed), Firecrawl keys mapped in;
-   Supabase and Scrapegraph keys deliberately excluded; `GITHUB_TOKEN` left
-   empty with a comment. `.env.example` updated with the same variable names
-   (no values). File confirmed gitignored, never printed.
-2. `package.json`: `name` → `jarvis`; added `"typecheck": "tsc --noEmit"`;
-   removed `@vercel/analytics` dependency and its import + `<Analytics />`
-   usage in `app/layout.tsx`; removed the dead `pnpm.overrides` /
-   `onlyBuiltDependencies` field (pnpm 11 ignores it; already superseded by
-   `pnpm-workspace.yaml`). `shadcn` dependency **kept** — `app/globals.css:3`
-   has `@import 'shadcn/tailwind.css';`, confirming it is a real runtime
-   import, not just the CLI, so removing it would break the build.
-3. `pnpm-workspace.yaml`: restored the dropped `overrides: { hono: 4.12.25 }`
-   pin. `pnpm install` run; verified only one `hono@4.12.25` entry resolves
-   anywhere in `pnpm-lock.yaml` (checked `@hono/node-server` and `mcp-handler`
-   transitive deps too — all pin to `4.12.25`, confirmed via
-   `node_modules/.pnpm/hono@4.12.25`).
-4. `next.config.mjs`: removed `typescript.ignoreBuildErrors` entirely; added
-   `turbopack: { root: import.meta.dirname }` per
-   `node_modules/next/dist/docs/.../turbopack.md` (`root` is the documented
-   key for manually setting the Turbopack project root; the workspace-root
-   auto-detection warning is now gone from `pnpm build` output).
-5. `.gitignore`: added `next-env.d.ts` and `tsconfig.tsbuildinfo`.
-   `git rm --cached tsconfig.tsbuildinfo` run (was tracked, ~500KB build
-   artifact; now untracked and ignored). `next-env.d.ts` was already
-   untracked, now also explicitly ignored going forward.
-6. Ollama: see Environment Notes below — installed via winget, running,
-   `nomic-embed-text` pulled successfully.
+## Deferred / for the batched review pass (Yash's instruction)
 
-## Blockers
+1. Streamed failover chat turn end-to-end capture (see above).
+2. NVIDIA NIM live probe (`meta/llama-3.3-70b-instruct`) — wired per the
+   confirmed pin but not individually probed (chain never had to fall past
+   Groq during gates).
+3. `fetchPage` (Firecrawl) live probe — code path identical to webSearch's
+   pattern; not individually probed.
+4. Ollama chat floor untested (llama3.2:3b still not pulled — optional).
 
-None outstanding for Phase 0. Carried into Phase 1 (not blockers, just scope):
+## Environment notes (delta vs Phase 0)
 
-- `GITHUB_TOKEN` is empty — GitHub connector and skill deploy will throw
-  until a classic PAT (repo + notifications scopes) is added to `.env.local`
-  by Yash. Documented, not fixed here (out of Phase 0 scope; env plumbing
-  only, no code changes to the connector).
-- `chatModel` (`llama3.2:3b`) not pulled — optional per the plan ("Ollama +
-  nomic-embed-text (+ llama3.2:3b optional)"). Skipped to keep Phase 0 tight;
-  the keyword fallback and the Phase 1 provider chain (Gemini → OpenRouter →
-  NVIDIA → Ollama) do not require the local chat model for correctness. Pull
-  it later with `ollama pull llama3.2:3b` if a Phase 6 voice-latency test
-  wants a local option.
-- `GROQ_API_KEY` still empty in `.env.local` — current brain
-  (`lib/agent.ts:20-33`) is Groq → Ollama chat, so chat is still dead until
-  Phase 1's provider rewire lands. This is the documented P0 item #1 in the
-  plan, explicitly deferred to Phase 1.
+- Groq: GROQ_API_KEY is present in `.env.local`, so Groq joined the chain as
+  provider #2 (plan 2.1 order preserved otherwise).
+- OpenRouter free-model landscape shifts; rotation list lives at the top of
+  `lib/providers.ts` — refresh via https://openrouter.ai/api/v1/models
+  (filter `:free` + `tools`) if models 404 later.
+- Dev-server processes on Windows: kill via
+  `Get-NetTCPConnection -LocalPort 3100` + `Stop-Process` (bash job control
+  does not span tool calls).
 
 ## Next Step
 
-**Phase 1 — Brain rewire + research chain** (Opus xhigh), per
-`tasks/PLAN.md` section 3:
-- New `lib/providers.ts` failsafe chain: Gemini 2.5 Flash → OpenRouter free
-  models → NVIDIA NIM → Ollama local. Keys for the first three are now live
-  in `.env.local` from this Phase 0 run.
-- Rewrite `getChatModel()`, add settings brain picker + provider status.
-- Harden `/api/chat` (body validation, try/catch, message-history cap).
-- Fix `lib/skills.ts:271` missing `.where()` clause.
-- Timestamp normalization (ms vs seconds) — backup DB first.
-- Add research tools (`webSearch` via Tavily → Serper, `fetchPage` via
-  Firecrawl) to the agent toolset — keys are live in `.env.local`.
-- Update `.env.example` further if new variable names are introduced.
-- GATE: streaming tool-calling chat demonstrated end-to-end ("remember X" →
-  memory row written); kill primary key → visible failover to next provider;
-  `webSearch` live; typecheck/build stay green.
-
-Report back to Fable for advisory review after Phase 1 completes, per the
-plan's per-phase checkpoint rule.
-
-## Environment Notes
-
-- **Ollama**: was absent at session start (`ollama --version` → command not
-  found; no `C:\Users\win 10\AppData\Local\Programs\Ollama\ollama.exe`).
-  Installed via `winget install --id Ollama.Ollama --accept-source-agreements
-  --accept-package-agreements --silent` — succeeded (`Successfully installed`,
-  version 0.31.1). The installed tray app (`ollama app.exe`) did not bring up
-  the API server cleanly on first launch (log rotation lock error, "timed out
-  waiting for server to start" on `ollama pull`); resolved by killing the
-  stuck tray/setup processes and starting the server directly with
-  `ollama.exe serve`, which came up clean and logged
-  `Listening on 127.0.0.1:11434`. `ollama pull nomic-embed-text` succeeded
-  (274 MB). `/api/health` confirms `ollama.ok=true` and the embedding model
-  `pulled=true`. **Action for Yash**: on future machine restarts, if the
-  status bar shows Ollama offline, check whether `ollama app.exe` auto-starts
-  the server; if not, run `ollama serve` manually or investigate the log
-  rotation lock (`C:\Users\win 10\AppData\Local\Ollama\app.log` /
-  `app-1.log` contention) — likely a leftover handle from the installer's own
-  process, not expected to recur on a clean boot.
-- **GITHUB_TOKEN**: intentionally left empty in both `.env.local` and
-  `.env.example`, with a comment directing Yash to add a classic PAT with
-  `repo` + `notifications` scopes when he wants the GitHub connector /
-  skill-deploy tools live.
-- **pnpm path**: `pnpm` (11.10.0) resolves on PATH in both Git Bash and
-  PowerShell in this environment; no need for the full
-  `C:\Users\win 10\AppData\Roaming\npm\pnpm` path during this session.
-- **Secrets discipline**: `keys.evn` was read once to source values; no key
-  value was echoed to any command output, commit message, or tracked file
-  during this session. `.env.local` is confirmed gitignored via
-  `git check-ignore -v .env.local`.
-- **KeysJarvis.env**: an untracked `KeysJarvis.env` file appeared at the repo
-  root mid-run (not created by this executor; contents never read or
-  printed). It was NOT covered by the `.env*.local` gitignore pattern, so it
-  was added to `.gitignore` explicitly to guarantee it can never be staged.
-  If it duplicates `keys.evn`, consider deleting it from the repo folder and
-  keeping secrets only in `Desktop\keys.evn` and `.env.local`.
-- **tasks/ directory**: `tasks/PLAN.md` (approved master plan) and
-  `tasks/lessons.md` (self-improvement log) were present on disk but
-  untracked at session start. Committed in this run's docs commit as
-  legitimate project documentation needed for cross-session continuity — no
-  secrets in either file (verified by reading both in full before staging).
+**Phase 2 — Design system: Arc Reactor identity** (`tasks/PLAN.md` §3):
+globals.css rewrite (near-black #07090C, ice-cyan #38E1FF, hot-gold #FFB020,
+--accent-live plumbing), Space Grotesk, motion utilities + reduced-motion
+layer, contrast audit. Then Phase 3 (neural core + arc reactor + theme engine)
+per Yash's batch instruction, with the combined review after.
