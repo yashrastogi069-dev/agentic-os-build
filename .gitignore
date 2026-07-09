@@ -6,13 +6,17 @@ __v0_jsx-dev-runtime.ts
 .v0-trash/
 .vercel/
 
-# Environment variables
+# Environment variables and local key files (never commit secrets)
 .env*.local
+KeysJarvis.env
+*.keys.env
 
 # Common ignores
 node_modules
 .next/
 .DS_Store
+next-env.d.ts
+tsconfig.tsbuildinfo
 
 # Agentic OS local data (SQLite DB, voice binaries and models)
 data/
