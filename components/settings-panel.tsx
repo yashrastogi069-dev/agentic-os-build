@@ -15,6 +15,29 @@ type Settings = {
   defaults: { groqModel: string }
 }
 
+type BrainStatus = 'active' | 'ready' | 'cooling' | 'down'
+
+type Health = {
+  brain?: {
+    active: string
+    chain: { id: string; label: string; status: BrainStatus }[]
+  }
+}
+
+const BRAIN_DOT: Record<BrainStatus, string> = {
+  active: 'bg-success animate-core-pulse',
+  ready: 'bg-success/40',
+  cooling: 'bg-warning',
+  down: 'bg-muted-foreground/40',
+}
+
+const BRAIN_LABEL: Record<BrainStatus, string> = {
+  active: 'active',
+  ready: 'standby',
+  cooling: 'cooling down',
+  down: 'no key / offline',
+}
+
 async function postSettings(body: Record<string, unknown>) {
   const res = await fetch('/api/settings', {
     method: 'POST',
@@ -27,6 +50,7 @@ async function postSettings(body: Record<string, unknown>) {
 
 export function SettingsPanel() {
   const { data } = useSWR<Settings>('/api/settings', fetcher)
+  const { data: health } = useSWR<Health>('/api/health', fetcher, { refreshInterval: 10_000 })
   const [obsidianKey, setObsidianKey] = useState('')
   const [telegramToken, setTelegramToken] = useState('')
   const [googleClientId, setGoogleClientId] = useState('')
@@ -57,31 +81,32 @@ export function SettingsPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-3">
-      {/* Brain */}
+      {/* Brain — provider failsafe chain (auto-routed, read-only status) */}
       <section>
         <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
           agent brain
         </h3>
-        <div className="flex gap-2">
-          {(['groq', 'ollama'] as const).map((brain) => (
-            <button
-              key={brain}
-              type="button"
-              onClick={() =>
-                postSettings({ action: 'setChat', brain, groqModel: data.chat.groqModel })
-              }
-              className={`flex-1 rounded-sm border px-3 py-2 font-mono text-xs uppercase tracking-widest transition-colors ${
-                data.chat.brain === brain
-                  ? 'border-primary/60 bg-primary/15 text-primary'
-                  : 'border-border text-muted-foreground hover:border-primary/30'
-              }`}
-            >
-              {brain === 'groq' ? 'groq (cloud, fast)' : 'ollama (offline)'}
-            </button>
-          ))}
-        </div>
-        <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-          groq model: {data.chat.groqModel}
+        {health?.brain ? (
+          <ul className="space-y-1.5">
+            {health.brain.chain.map((p) => (
+              <li key={p.id} className="flex items-center gap-2">
+                <span
+                  className={`inline-block size-1.5 shrink-0 rounded-full ${BRAIN_DOT[p.status]}`}
+                  aria-hidden="true"
+                />
+                <span className="font-mono text-xs text-foreground">{p.label}</span>
+                <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  {BRAIN_LABEL[p.status]}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="font-mono text-[10px] text-muted-foreground">reading provider chain…</p>
+        )}
+        <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted-foreground">
+          auto-routed: gemini → groq → openrouter → nvidia → ollama. failover is
+          automatic on rate-limit or outage.
         </p>
       </section>
 

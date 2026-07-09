@@ -16,6 +16,10 @@ export interface HealthData {
   obsidian: { configured: boolean; ok: boolean }
   voice: { whisper: boolean; piper: boolean }
   chat: { brain: 'groq' | 'ollama'; groqModel: string }
+  brain?: {
+    active: string
+    chain: { id: string; label: string; status: 'active' | 'ready' | 'cooling' | 'down' }[]
+  }
   mcp: { keySet: boolean }
 }
 
@@ -73,6 +77,14 @@ export function StatusBar({ onOpenSettings }: { onOpenSettings: () => void }) {
       </div>
 
       <div className="hidden flex-wrap items-center gap-4 md:flex">
+        {data?.brain?.active && (
+          <span
+            className="font-mono text-[10px] uppercase tracking-widest text-primary/80"
+            title="Active AI provider (failsafe chain head)"
+          >
+            brain: {data.brain.active}
+          </span>
+        )}
         <Dot label="db" state={data?.db.ok ? (data.db.vec ? 'ok' : 'warn') : 'off'} />
         <Dot
           label="ollama"

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { getRawDb, isVecAvailable } from "@/lib/db"
 import { ollamaIsUp, ollamaModels, EMBEDDING_MODEL, OLLAMA_CHAT_MODEL } from "@/lib/ollama"
 import { getObsidianSettings, getChatSettings, getMcpKey } from "@/lib/settings"
+import { getActiveProviderId, getProviderStatus } from "@/lib/providers"
 import { getTelegramSettings } from "@/lib/connectors/telegram"
 import { isGoogleConnected, getGoogleSettings } from "@/lib/connectors/google"
 import { getAppleSettings } from "@/lib/connectors/apple"
@@ -61,6 +62,15 @@ export async function GET() {
       binDir: path.relative(process.cwd(), path.dirname(WHISPER_BIN)),
     },
     chat: getChatSettings(),
+    // Provider failsafe chain: which brain answers now + per-provider status.
+    brain: {
+      active: getActiveProviderId(),
+      chain: getProviderStatus().map((p) => ({
+        id: p.id,
+        label: p.label,
+        status: p.status,
+      })),
+    },
     mcp: { keySet: Boolean(getMcpKey()) },
   })
 }

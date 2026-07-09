@@ -1,10 +1,26 @@
-import { ToolLoopAgent, tool, isStepCount, type LanguageModel } from "ai"
-import { createGroq } from "@ai-sdk/groq"
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
+import {
+  ToolLoopAgent,
+  tool,
+  isStepCount,
+  toUIMessageStream,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  validateUIMessages,
+  convertToModelMessages,
+  type LanguageModel,
+  type UIMessage,
+  type UIMessageChunk,
+  type Tool,
+} from "ai"
 import { z } from "zod"
 import { saveMemory, recallMemory } from "@/lib/memory"
-import { getChatSettings } from "@/lib/settings"
-import { OLLAMA_URL, OLLAMA_CHAT_MODEL } from "@/lib/ollama"
+import {
+  resolveModel,
+  getResolutionChain,
+  markProviderCooldown,
+  type ResolvedProvider,
+} from "@/lib/providers"
+import { researchTools } from "@/lib/research"
 import { obsidianTools } from "@/lib/connectors/obsidian"
 import { githubTools } from "@/lib/connectors/github"
 import { telegramTools } from "@/lib/connectors/telegram"
@@ -13,23 +29,14 @@ import { appleTools } from "@/lib/connectors/apple"
 import { getRecentEvents } from "@/lib/events"
 
 /**
- * The OS agent. Brain selection (Settings model picker):
- * - groq (default): fast free cloud inference, GROQ_API_KEY
- * - ollama (offline fallback): llama3.2:3b via Ollama's OpenAI-compatible API
+ * The OS brain now comes from the provider failsafe chain (lib/providers.ts):
+ * Gemini -> Groq -> OpenRouter -> NVIDIA -> Ollama. `getChatModel()` returns
+ * the first healthy provider's model — used by non-streaming callers
+ * (skills.ts). Streaming chat uses `streamOsAgentResponse()` below, which adds
+ * per-provider failover before the first token.
  */
 export function getChatModel(): LanguageModel {
-  const settings = getChatSettings()
-
-  if (settings.brain === "ollama" || !process.env.GROQ_API_KEY) {
-    const ollama = createOpenAICompatible({
-      name: "ollama",
-      baseURL: `${OLLAMA_URL}/v1`,
-    })
-    return ollama(OLLAMA_CHAT_MODEL)
-  }
-
-  const groq = createGroq()
-  return groq(settings.groqModel)
+  return resolveModel().model
 }
 
 const memoryTools = {
@@ -155,6 +162,7 @@ Capabilities:
 - Google: getCalendarEvents / getRecentEmails (when the user connects Google in Settings).
 - Apple Calendar: getAppleCalendarEvents via iCloud (when Apple ID + app password are configured).
 - Updates feed: merged events from all connectors; use it for briefings.
+- Web research: webSearch (live web) + fetchPage (read a URL as markdown). Use these for latest versions, current events, and any fact you are unsure about instead of guessing.
 - Skill Factory: saveAsSkill / listSkills / runSkill. When the user mentions doing something repeatedly, offer to save it as a skill.
 
 Behavior:
@@ -163,22 +171,150 @@ Behavior:
 - If a tool fails because a local service is offline (Ollama, Obsidian), say so plainly and continue with what works.
 - Never invent memory contents or note contents — only report what tools return.`
 
-export function createOsAgent() {
+const allTools = {
+  ...memoryTools,
+  ...feedTools,
+  ...skillTools,
+  ...researchTools,
+  ...obsidianTools,
+  ...githubTools,
+  ...telegramTools,
+  ...googleTools,
+  ...appleTools,
+}
+
+/** Build the OS agent on a specific model (used by the failover loop). */
+export function buildAgent(model: LanguageModel) {
   return new ToolLoopAgent({
-    model: getChatModel(),
+    model,
     instructions: INSTRUCTIONS,
-    tools: {
-      ...memoryTools,
-      ...feedTools,
-      ...skillTools,
-      ...obsidianTools,
-      ...githubTools,
-      ...telegramTools,
-      ...googleTools,
-      ...appleTools,
-    },
+    tools: allTools,
     stopWhen: isStepCount(12),
   })
 }
 
+/** The OS agent on the current head-of-chain provider. */
+export function createOsAgent() {
+  return buildAgent(getChatModel())
+}
+
 export type OsAgent = ReturnType<typeof createOsAgent>
+
+/**
+ * Stream a chat turn with provider failover.
+ *
+ * We try each healthy provider in chain order. A provider's output is buffered
+ * until its first *content* chunk arrives; only then is it "committed" (its
+ * framing + content flushed to the client, tagged with a transient `data-brain`
+ * part naming the provider). If a provider errors BEFORE committing, it is put
+ * on cooldown and we transparently retry the next provider — the client never
+ * sees the failed attempt. Once committed, a later error is surfaced honestly
+ * (we do not silently swap brains mid-answer).
+ */
+
+// Chunk types that are pure message framing (safe to buffer before commit).
+const FRAMING_TYPES = new Set(["start", "start-step", "finish-step", "message-metadata"])
+
+function chunkErrText(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "string") return error
+  return String(error)
+}
+
+export async function streamOsAgentResponse(uiMessages: UIMessage[]): Promise<Response> {
+  // Loose cast: validateUIMessages wants Tool<unknown, unknown> per name, and
+  // the concrete per-tool input types create needless invariance friction (the
+  // ai package itself casts here inside createAgentUIStream, which is untyped JS).
+  const looseTools = allTools as unknown as Record<string, Tool<unknown, unknown>>
+  const validated = await validateUIMessages({ messages: uiMessages, tools: looseTools })
+  const modelMessages = await convertToModelMessages(validated, { tools: allTools })
+
+  const chain = getResolutionChain()
+  const candidates: ResolvedProvider[] = chain.length > 0 ? chain : [resolveModel()]
+
+  const stream = createUIMessageStream({
+    originalMessages: validated,
+    execute: async ({ writer }) => {
+      let lastError = "No AI provider is currently available. Check API keys in Settings."
+
+      for (const cand of candidates) {
+        let result
+        try {
+          result = await buildAgent(cand.model).stream({ prompt: modelMessages })
+        } catch (error) {
+          lastError = chunkErrText(error)
+          markProviderCooldown(cand.id, error)
+          continue
+        }
+
+        const reader = toUIMessageStream({
+          stream: result.stream,
+          tools: allTools,
+          sendStart: true,
+          sendFinish: true,
+        }).getReader()
+
+        let committed = false
+        const buffer: UIMessageChunk[] = []
+        let failedPreCommit = false
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            if (!committed && value.type === "error") {
+              failedPreCommit = true
+              lastError = value.errorText || lastError
+              markProviderCooldown(cand.id, value.errorText)
+              break
+            }
+
+            if (committed) {
+              writer.write(value)
+              continue
+            }
+
+            if (FRAMING_TYPES.has(value.type)) {
+              buffer.push(value)
+              continue
+            }
+
+            // First real content chunk — commit to this provider.
+            committed = true
+            writer.write({
+              type: "data-brain",
+              data: { provider: cand.id, label: cand.label },
+              transient: true,
+            } as UIMessageChunk)
+            for (const buffered of buffer) writer.write(buffered)
+            buffer.length = 0
+            writer.write(value)
+          }
+        } catch (error) {
+          if (!committed) {
+            failedPreCommit = true
+            lastError = chunkErrText(error)
+            markProviderCooldown(cand.id, error)
+          } else {
+            // Honest mid-stream failure after we already started answering.
+            writer.write({ type: "error", errorText: chunkErrText(error) })
+            return
+          }
+        } finally {
+          reader.releaseLock()
+        }
+
+        if (committed) return
+        if (failedPreCommit) continue
+        // Stream ended cleanly with no content and no error — nothing to retry.
+        return
+      }
+
+      writer.write({ type: "error", errorText: lastError })
+    },
+    onError: (error) => chunkErrText(error),
+  })
+
+  return createUIMessageStreamResponse({ stream })
+}
