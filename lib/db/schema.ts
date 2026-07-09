@@ -1,6 +1,16 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core"
 
 /**
+ * Timestamp convention (unified 2026-07-09, PLAN 1.4): every timestamp column
+ * uses `mode: "timestamp_ms"` so Drizzle stores/reads epoch MILLISECONDS. This
+ * matches the raw-SQL paths (lib/events.ts, lib/memory.ts, lib/settings.ts)
+ * which already write `Date.now()` (ms). Previously the Drizzle columns used
+ * `mode: "timestamp"` (seconds), so cross-path reads rendered 1970 dates. A
+ * one-time idempotent migration (scripts/normalize-timestamps.mjs) converts any
+ * legacy seconds values (< 1e12) to ms.
+ */
+
+/**
  * Long-term memory. Embeddings live in the `vec_memories` sqlite-vec virtual
  * table (rowid = memories.id) because vec0 tables cannot be modeled by Drizzle.
  */
@@ -9,10 +19,10 @@ export const memories = sqliteTable("memories", {
   content: text("content").notNull(),
   category: text("category").notNull().default("general"),
   source: text("source").notNull().default("chat"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
 })
@@ -24,7 +34,7 @@ export const events = sqliteTable("events", {
   title: text("title").notNull(),
   payload: text("payload", { mode: "json" }).$type<Record<string, unknown>>(),
   externalId: text("external_id"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
 })
@@ -36,7 +46,7 @@ export const connectorSettings = sqliteTable("connector_settings", {
   configJson: text("config_json", { mode: "json" })
     .$type<Record<string, unknown>>()
     .notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
 })
@@ -54,10 +64,10 @@ export const skills = sqliteTable("skills", {
   version: integer("version").notNull().default(1),
   /** Last GitHub deploy target, e.g. "owner/repo@.claude/skills/name". */
   deployedTo: text("deployed_to"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
 })
@@ -72,7 +82,7 @@ export const skillRuns = sqliteTable("skill_runs", {
   /** 1 = thumbs up, -1 = thumbs down, 0 = unrated. */
   rating: integer("rating").notNull().default(0),
   feedback: text("feedback"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
 })
@@ -86,7 +96,7 @@ export const agentRuns = sqliteTable("agent_runs", {
   userMessage: text("user_message").notNull(),
   /** Set once a discovery pass has considered this run. */
   analyzed: integer("analyzed").notNull().default(0),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
 })

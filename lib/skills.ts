@@ -1,5 +1,5 @@
 import { generateText } from "ai"
-import { eq, desc, sql } from "drizzle-orm"
+import { eq, desc, sql, inArray } from "drizzle-orm"
 import { getDb, schema } from "@/lib/db"
 import { getChatModel } from "@/lib/agent"
 
@@ -268,7 +268,15 @@ Rules:
     created.push({ id: skill.id, name: skill.name })
   }
 
-  db.update(agentRuns).set({ analyzed: 1 }).run()
+  // Only mark the runs we actually pulled into this analysis window — never a
+  // blanket update (that would silently swallow unanalyzed runs outside the 200).
+  const analyzedIds = runs.map((r) => r.id)
+  if (analyzedIds.length > 0) {
+    db.update(agentRuns)
+      .set({ analyzed: 1 })
+      .where(inArray(agentRuns.id, analyzedIds))
+      .run()
+  }
 
   return {
     created,
