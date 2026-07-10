@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { StatusBar } from '@/components/status-bar'
 import { CoreStage, type CoreState } from '@/components/core-stage'
+import { useThemeStore } from '@/lib/theme-engine'
 import { ChatPanel } from '@/components/chat-panel'
 import { FeedPanel } from '@/components/feed-panel'
 import { MemoryPanel } from '@/components/memory-panel'
@@ -31,7 +32,17 @@ export default function Home() {
               agent // chat
             </h2>
           </header>
-          <ChatPanel onStateChange={setCoreState} />
+          <ChatPanel
+            onStateChange={(state) => {
+              // Dual-write (Phase 3 Chunk A, temporary): the old UI still
+              // reads coreState from this local useState via the CoreStage
+              // prop below, while the new zustand theme engine (driving
+              // --accent-live) reads it from the store. Chunk B removes the
+              // local useState and wires HudShell directly to the store.
+              setCoreState(state)
+              useThemeStore.getState().setCoreState(state)
+            }}
+          />
         </section>
 
         {/* Core stage — center, hidden on small screens to prioritize function */}

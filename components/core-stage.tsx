@@ -2,8 +2,13 @@
 
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useHealth } from '@/components/status-bar'
+import type { CoreState } from '@/lib/theme-engine'
 
-export type CoreState = 'idle' | 'listening' | 'thinking' | 'speaking'
+// Canonical home is lib/theme-engine.ts (Phase 3 §4 — the zustand theme
+// store owns CoreState now). Re-exported here so existing imports of
+// `@/components/core-stage` keep working without touching every importer
+// in this chunk; Chunk B removes this indirection when it rewrites the UI.
+export type { CoreState }
 
 // The 3D neural core is client-only (WebGL). Using lazy + a mount guard keeps
 // server rendering intact (no next/dynamic ssr:false bail-out, which 500s the

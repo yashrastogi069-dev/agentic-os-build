@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono, Space_Grotesk } from 'next/font/google'
+import { ThemeEngineProvider } from '@/components/theme-engine-provider'
 import './globals.css'
 
 // Body / UI text.
@@ -52,7 +53,7 @@ export default function RootLayout({
       className={`dark bg-background ${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable}`}
     >
       <body className="font-sans antialiased">
-        {children}
+        <ThemeEngineProvider>{children}</ThemeEngineProvider>
       </body>
     </html>
   )
