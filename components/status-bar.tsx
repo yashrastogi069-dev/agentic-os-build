@@ -31,7 +31,11 @@ export function useHealth() {
 
 function Dot({ label, state }: { label: string; state: 'ok' | 'warn' | 'off' }) {
   const color =
-    state === 'ok' ? 'bg-success' : state === 'warn' ? 'bg-warning' : 'bg-muted-foreground/40'
+    state === 'ok'
+      ? 'bg-success text-success shadow-[0_0_6px_currentColor]'
+      : state === 'warn'
+        ? 'bg-warning text-warning shadow-[0_0_6px_currentColor]'
+        : 'bg-muted-foreground/40'
   return (
     <div className="flex items-center gap-1.5" title={`${label}: ${state}`}>
       <span
@@ -68,8 +72,8 @@ export function StatusBar({ onOpenSettings }: { onOpenSettings: () => void }) {
   return (
     <header className="flex items-center justify-between gap-4 bg-transparent px-4 py-2 backdrop-blur">
       <div className="flex items-center gap-3">
-        <span className="text-glow font-mono text-sm font-semibold tracking-widest text-primary">
-          AGENTIC/OS
+        <span className="display text-glow text-[15px] font-semibold tracking-[0.02em] text-primary">
+          AGENTIC<span className="text-accent">/</span>OS
         </span>
         <span className="hidden font-mono text-[10px] uppercase tracking-widest text-muted-foreground sm:inline">
           local-first
@@ -79,7 +83,7 @@ export function StatusBar({ onOpenSettings }: { onOpenSettings: () => void }) {
       <div className="hidden flex-wrap items-center gap-4 md:flex">
         {data?.brain?.active && (
           <span
-            className="font-mono text-[10px] uppercase tracking-widest text-primary/80"
+            className="text-glow font-mono text-[10px] uppercase tracking-widest text-primary"
             title="Active AI provider (failsafe chain head)"
           >
             brain: {data.brain.active}
@@ -110,11 +114,11 @@ export function StatusBar({ onOpenSettings }: { onOpenSettings: () => void }) {
       </div>
 
       <div className="flex items-center gap-3">
-        <time className="font-mono text-xs tabular-nums text-muted-foreground">{time}</time>
+        <time className="font-mono text-xs tabular-nums text-foreground/75">{time}</time>
         <button
           type="button"
           onClick={onOpenSettings}
-          className="rounded-md border border-border bg-secondary p-1.5 text-muted-foreground transition-colors hover:text-primary"
+          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-[oklch(from_var(--accent-live)_l_c_h_/_10%)] hover:text-primary"
           aria-label="Open settings"
         >
           <Settings2 className="size-4" aria-hidden="true" />

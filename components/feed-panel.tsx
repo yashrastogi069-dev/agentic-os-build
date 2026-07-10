@@ -87,11 +87,11 @@ export function FeedPanel() {
           {'> connect GitHub / Obsidian in settings, then refresh.'}
         </p>
       )}
-      <ul className="space-y-2">
+      <ul>
         {events.map((event) => (
           <li
             key={event.id}
-            className="rounded-sm border border-border bg-card px-3 py-2"
+            className="rounded-md border-b border-[oklch(1_0_0_/_6%)] px-3 py-2 transition-colors last:border-b-0 hover:bg-[oklch(1_0_0_/_4%)]"
           >
             <div className="flex items-center justify-between gap-2">
               <span

@@ -155,10 +155,10 @@ export function ChatPanel({
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`max-w-[92%] rounded-md border px-3 py-2 text-sm leading-relaxed ${
+            className={`max-w-[92%] rounded-md px-3 py-2 text-sm leading-relaxed ${
               message.role === 'user'
-                ? 'ml-auto border-primary/30 bg-primary/10 text-foreground'
-                : 'border-border bg-card text-card-foreground'
+                ? 'ml-auto bg-[oklch(from_var(--accent-live)_l_c_h_/_10%)] text-foreground shadow-[inset_0_0_0_1px_oklch(from_var(--accent-live)_l_c_h_/_20%)]'
+                : 'text-foreground'
             }`}
           >
             <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -200,7 +200,14 @@ export function ChatPanel({
         )}
       </div>
 
-      <div className="flex gap-2 border-t border-border px-3 pt-2">
+      <div
+        className="mx-3 h-px"
+        style={{
+          background: 'linear-gradient(90deg, transparent, oklch(1 0 0 / 10%), transparent)',
+        }}
+        aria-hidden="true"
+      />
+      <div className="flex gap-2 px-3 pt-2">
         {['brief me', "what's new on github?", 'what do you know about me?'].map(
           (quick) => (
             <button
@@ -208,7 +215,7 @@ export function ChatPanel({
               type="button"
               disabled={busy}
               onClick={() => sendMessage({ text: quick })}
-              className="rounded-sm border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-40"
+              className="rounded-sm border border-[oklch(from_var(--accent-live)_l_c_h_/_22%)] px-2 py-1 font-mono text-[10px] text-primary/85 transition-colors hover:bg-[oklch(from_var(--accent-live)_l_c_h_/_10%)] hover:text-primary disabled:opacity-40"
             >
               {quick}
             </button>
@@ -217,7 +224,7 @@ export function ChatPanel({
       </div>
 
       <form
-        className="flex items-center gap-2 border-t-0 p-3"
+        className="flex items-center gap-2 rounded-lg bg-[oklch(0.1_0.02_250_/_55%)] p-3 shadow-[inset_0_0_0_1px_oklch(1_0_0_/_7%)] transition-shadow focus-within:shadow-[inset_0_0_0_1px_oklch(from_var(--accent-live)_l_c_h_/_45%),0_0_16px_oklch(from_var(--accent-live)_l_c_h_/_12%)] m-3 mt-2"
         onSubmit={(e) => {
           e.preventDefault()
           submit()
@@ -259,7 +266,7 @@ export function ChatPanel({
               ? 'animate-pulse border-destructive/60 bg-destructive/15 text-destructive'
               : voiceState === 'speaking'
                 ? 'border-accent/60 bg-accent/15 text-accent'
-                : 'border-border text-muted-foreground hover:border-primary/40 hover:text-primary'
+                : 'border-[oklch(from_var(--accent-live)_l_c_h_/_30%)] text-primary hover:border-[oklch(from_var(--accent-live)_l_c_h_/_55%)]'
           }`}
         >
           {voiceState === 'recording'
@@ -273,7 +280,7 @@ export function ChatPanel({
         <button
           type="submit"
           disabled={busy || input.trim().length === 0}
-          className="rounded-sm border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-xs uppercase tracking-widest text-primary transition-colors hover:bg-primary/20 disabled:opacity-40"
+          className="rounded-sm bg-[oklch(from_var(--accent-live)_l_c_h_/_90%)] px-3 py-1 font-mono text-xs uppercase tracking-widest text-primary-foreground transition-all duration-[var(--duration-fast)] hover:bg-[var(--accent-live)] active:scale-[0.97] disabled:opacity-40"
         >
           send
         </button>

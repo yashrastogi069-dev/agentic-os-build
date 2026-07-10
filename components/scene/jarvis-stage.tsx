@@ -43,32 +43,64 @@ function probeWebGL(): boolean {
   }
 }
 
-/** Placeholder standing in for the Arc Reactor group until Chunk C. */
+/** Soft radial-gradient sprite texture for the core halo (cheap fake volumetric). */
+function makeHaloTexture(): THREE.CanvasTexture {
+  const size = 128
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    gradient.addColorStop(0, 'rgba(255,255,255,0.9)')
+    gradient.addColorStop(0.4, 'rgba(255,255,255,0.28)')
+    gradient.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, size, size)
+  }
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.needsUpdate = true
+  return texture
+}
+
+/** Placeholder standing in for the Arc Reactor group until Chunk C: smooth
+ * emissive core + additive halo + one machined dark-metal ring, tilted 12°
+ * toward camera — the dark-metal-vs-light contrast of §8.3 in miniature. */
 function ReactorPlaceholder() {
-  const meshRef = useRef<THREE.Mesh>(null)
-  const materialRef = useRef<THREE.MeshBasicMaterial>(null)
+  const groupRef = useRef<THREE.Group>(null)
+  const coreMaterialRef = useRef<THREE.MeshBasicMaterial>(null)
+  const haloMaterialRef = useRef<THREE.SpriteMaterial>(null)
   const scratchColor = useMemo(() => new THREE.Color(), [])
   const rgbScratch = useMemo(() => ({ r: 0, g: 0, b: 0 }), [])
+  const haloTexture = useMemo(() => makeHaloTexture(), [])
+
+  useEffect(() => {
+    return () => haloTexture.dispose()
+  }, [haloTexture])
 
   useFrame(({ clock }) => {
     const { hue, energy, reducedMotion } = useThemeStore.getState()
     writeLiveAccentSrgb(hue, rgbScratch)
     scratchColor.setRGB(rgbScratch.r, rgbScratch.g, rgbScratch.b, THREE.SRGBColorSpace)
-    if (materialRef.current) {
-      materialRef.current.color.copy(scratchColor)
+    if (coreMaterialRef.current) {
+      coreMaterialRef.current.color.copy(scratchColor)
     }
-    if (meshRef.current) {
+    if (haloMaterialRef.current) {
+      haloMaterialRef.current.color.copy(scratchColor)
+    }
+    if (groupRef.current) {
       const breathe = reducedMotion
         ? 1
         : 1 + 0.05 * Math.sin(clock.getElapsedTime() * 1.4) * (0.5 + energy * 0.5)
-      meshRef.current.scale.setScalar(breathe)
+      groupRef.current.scale.setScalar(breathe)
     }
   })
 
   return (
-    <mesh
-      ref={meshRef}
+    <group
+      ref={groupRef}
       position={[0, -0.15, 0]}
+      rotation={[-0.21, 0, 0]}
       onPointerOver={(event) => {
         event.stopPropagation()
         document.body.style.cursor = 'pointer'
@@ -84,9 +116,25 @@ function ReactorPlaceholder() {
         )
       }}
     >
-      <icosahedronGeometry args={[0.62, 1]} />
-      <meshBasicMaterial ref={materialRef} toneMapped={false} />
-    </mesh>
+      <mesh>
+        <icosahedronGeometry args={[0.45, 4]} />
+        <meshBasicMaterial ref={coreMaterialRef} toneMapped={false} />
+      </mesh>
+      <sprite scale={[2.6, 2.6, 1]} position={[0, 0, -0.05]}>
+        <spriteMaterial
+          ref={haloMaterialRef}
+          map={haloTexture}
+          transparent
+          opacity={0.4}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </sprite>
+      <mesh>
+        <torusGeometry args={[0.85, 0.018, 12, 96]} />
+        <meshStandardMaterial color={0x1a2028} metalness={0.85} roughness={0.35} />
+      </mesh>
+    </group>
   )
 }
 
@@ -127,7 +175,7 @@ function ReducedMotionInvalidator() {
 function SceneContents() {
   return (
     <>
-      <fog attach="fog" args={[0x07090c, 0.055]} />
+      <fog attach="fog" args={[0x0b0d14, 0.05]} />
       <ambientLight intensity={0.15} />
       <ReactorLight />
       <SpaceEnvironment />

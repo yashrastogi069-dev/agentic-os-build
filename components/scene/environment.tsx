@@ -43,6 +43,34 @@ function buildShellPositions(count: number, rMin: number, rMax: number): Float32
   return positions
 }
 
+// Stellar temperature variance: mostly ice white, a warm K-class minority,
+// and a violet-white sprinkle — space reads as space, not white noise.
+const STAR_PALETTE: Array<{ color: THREE.Color; weight: number }> = [
+  { color: new THREE.Color('#cfe6f2'), weight: 0.68 },
+  { color: new THREE.Color('#ffd9a8'), weight: 0.18 },
+  { color: new THREE.Color('#c9c4ff'), weight: 0.14 },
+]
+
+function buildStarColors(count: number): Float32Array {
+  const colors = new Float32Array(count * 3)
+  for (let i = 0; i < count; i++) {
+    const roll = Math.random()
+    let cumulative = 0
+    let picked = STAR_PALETTE[0].color
+    for (const entry of STAR_PALETTE) {
+      cumulative += entry.weight
+      if (roll <= cumulative) {
+        picked = entry.color
+        break
+      }
+    }
+    colors[i * 3] = picked.r
+    colors[i * 3 + 1] = picked.g
+    colors[i * 3 + 2] = picked.b
+  }
+  return colors
+}
+
 function Starfield({
   count,
   rMin,
@@ -64,6 +92,7 @@ function Starfield({
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(buildShellPositions(count, rMin, rMax), 3))
+    geo.setAttribute('color', new THREE.BufferAttribute(buildStarColors(count), 3))
     return geo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [count, rMin, rMax])
@@ -71,7 +100,7 @@ function Starfield({
   const material = useMemo(
     () =>
       new THREE.PointsMaterial({
-        color: new THREE.Color('#cfe6f2'),
+        vertexColors: true,
         size,
         sizeAttenuation: true,
         transparent: true,
@@ -127,9 +156,11 @@ const GRID_FRAGMENT_SHADER = /* glsl */ `
   void main() {
     vec2 scrolled = vWorldXZ + vec2(0.0, -uTime * 0.008);
     float line = gridLines(scrolled);
+    // Major lines every 4th cell at 2.2x weight — instrument-panel rhythm.
+    float major = gridLines(scrolled / 4.0);
     float dist = length(vWorldXZ);
     float fade = 1.0 - smoothstep(uFadeRadius * 0.35, uFadeRadius, dist);
-    float alpha = line * uOpacity * fade;
+    float alpha = max(line, major * 2.2) * uOpacity * fade;
     if (alpha <= 0.001) discard;
     gl_FragColor = vec4(uColor, alpha);
   }
@@ -143,7 +174,7 @@ function GridFloor() {
     () => ({
       uColor: { value: new THREE.Color('#38e1ff') },
       uTime: { value: 0 },
-      uOpacity: { value: 0.07 },
+      uOpacity: { value: 0.14 },
       uFadeRadius: { value: 24 },
     }),
     [],
@@ -177,7 +208,7 @@ function GridFloor() {
 // Dust motes — additive sprites, gentle drift
 // ---------------------------------------------------------------------------
 
-const DUST_COUNT = 64
+const DUST_COUNT = 96
 
 function buildDust(count: number) {
   const positions = new Float32Array(count * 3)
@@ -229,10 +260,10 @@ function DustMotes() {
       new THREE.PointsMaterial({
         map: texture,
         color: new THREE.Color('#bfe0ff'),
-        size: 0.14,
+        size: 0.18,
         sizeAttenuation: true,
         transparent: true,
-        opacity: 0.09,
+        opacity: 0.16,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       }),

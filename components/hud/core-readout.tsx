@@ -38,14 +38,14 @@ export function CoreReadout() {
       >
         talk to jarvis · alt+j
       </p>
-      <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-        core // {coreState}
+      <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+        core <span className="text-accent/70">//</span> {coreState}
       </p>
       <p className="font-mono text-xs text-muted-foreground">
         {data ? (
           <>
-            <span className="text-primary">{data.db.memories.total}</span> memories ·{' '}
-            <span className="text-primary">{data.chat.brain}</span> brain
+            <span className="numeric text-[13px] text-primary">{data.db.memories.total}</span>{' '}
+            memories · <span className="text-primary">{data.chat.brain}</span> brain
           </>
         ) : (
           'probing services…'

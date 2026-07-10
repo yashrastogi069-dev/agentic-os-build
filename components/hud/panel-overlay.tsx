@@ -90,7 +90,7 @@ export function PanelOverlay({
       aria-label={title}
       className={
         variant === 'floating'
-          ? 'hud-glass enter-fade-up pointer-events-auto fixed bottom-3 right-[76px] top-24 z-40 flex w-[420px] max-w-[calc(100vw-96px)] flex-col rounded-[var(--radius-xl)]'
+          ? 'hud-glass hud-glass-accent-edge enter-slide-left pointer-events-auto fixed bottom-3 right-[76px] top-24 z-40 flex w-[420px] max-w-[calc(100vw-96px)] flex-col rounded-[var(--radius-xl)]'
           : // Near-opaque (not the standard 62%-alpha glass): this sits over the
             // status strip + chat transcript, not the abstract 3D stage, so it
             // must fully occlude that text rather than let it bleed through
@@ -99,7 +99,7 @@ export function PanelOverlay({
       }
     >
       <header className="flex items-center justify-between px-4 py-3">
-        <h2 className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-foreground/80">
           {title}
         </h2>
         <button

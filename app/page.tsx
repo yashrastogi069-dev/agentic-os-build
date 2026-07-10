@@ -40,8 +40,9 @@ export default function Home() {
 
   return (
     <main className="relative h-dvh overflow-hidden bg-background text-foreground">
-      {/* The stage — z-0, full-viewport, fixed. Phase 3 §1.1/§2. */}
-      <div className="fixed inset-0 z-0" aria-hidden="true">
+      {/* The stage — z-0, full-viewport, fixed. Phase 3 §1.1/§2. The
+          .hud-atmosphere grade shows through the alpha-transparent Canvas. */}
+      <div className="hud-atmosphere fixed inset-0 z-0" aria-hidden="true">
         {mounted && isDesktop ? (
           <Suspense fallback={<Poster variant="fallback" />}>
             <JarvisStage />

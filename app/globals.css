@@ -75,7 +75,7 @@
      utilities read it so the whole UI follows the live core color. */
   --accent-live: var(--primary);
 
-  --background: oklch(0.145 0.008 235);
+  --background: oklch(0.13 0.018 255);
   --foreground: oklch(0.955 0.006 220);
   --card: oklch(0.185 0.01 235);
   --card-foreground: oklch(0.955 0.006 220);
@@ -181,13 +181,49 @@
     animation: enter-scale-in var(--duration-fast) var(--ease-out-expo) both;
   }
 
+  /* Summoned-panel entrance — slides in from the right edge per §1.2
+     (a summon, not a toast). */
+  .enter-slide-left {
+    animation: enter-slide-left 220ms var(--ease-out-expo) both;
+  }
+
   /* HUD glass — Phase 3 §1.2/§6. Chrome-less floating surface for the chat
      dock, edge rail, and overlay panels. No border: glass reads as an open
      surface, not a boxed grid cell (Phase 3's explicit anti-boxing rule). */
   .hud-glass {
-    background: oklch(0.13 0.01 235 / 62%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: linear-gradient(
+      180deg,
+      oklch(0.22 0.03 235 / 70%) 0%,
+      oklch(0.14 0.025 245 / 64%) 45%,
+      oklch(0.11 0.022 262 / 68%) 100%
+    );
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    box-shadow:
+      inset 0 1px 0 oklch(0.95 0.06 213 / 12%),
+      inset 0 0 0 1px oklch(0.75 0.12 225 / 9%),
+      0 12px 40px oklch(0.05 0.03 262 / 45%);
+  }
+
+  /* Live-accent light-catch on a panel's top edge. Reserved for exactly two
+     surfaces (chat dock header, overlay panel header) per glow discipline.
+     NOTE: no `position: relative` here — hosts are already fixed/absolute
+     (which anchors the ::before), and a positioning declaration in this
+     utility would override Tailwind's fixed/absolute and break layout. */
+  .hud-glass-accent-edge::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 12%;
+    right: 12%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      oklch(from var(--accent-live) l c h / 35%),
+      transparent
+    );
+    pointer-events: none;
   }
 
   /* Near-opaque variant of .hud-glass for surfaces that must fully occlude
@@ -207,15 +243,25 @@
   /* Top-edge scrim — legibility gradient behind the un-boxed status strip
      (status-bar.tsx no longer has its own border/background). */
   .hud-scrim-top {
-    background: linear-gradient(to bottom, oklch(0.1 0.01 235 / 85%), transparent);
+    background: linear-gradient(to bottom, oklch(0.1 0.025 255 / 85%), transparent);
+  }
+
+  /* Atmosphere grade behind the transparent Canvas — violet horizon glow,
+     faint cyan zenith wash, vertical indigo ramp. Environmental depth hues
+     only (low chroma, never on interactive elements), so the live accent
+     still owns the screen per §8.6. */
+  .hud-atmosphere {
+    background:
+      radial-gradient(ellipse 120% 70% at 50% 108%, oklch(0.19 0.055 268 / 55%), transparent 62%),
+      radial-gradient(ellipse 80% 55% at 72% -8%, oklch(0.17 0.04 220 / 30%), transparent 65%),
+      linear-gradient(180deg, oklch(0.115 0.02 250), oklch(0.135 0.032 262));
   }
 
   /* A single soft 1px light edge on the right side only — the chat dock's
-     "border" per spec: a faded gradient line, not a hard divider. */
-  .hud-edge-fade {
-    position: relative;
-  }
-
+     "border" per spec: a faded gradient line, not a hard divider.
+     NOTE: no `position: relative` here — the host (chat dock) is absolutely
+     positioned already; declaring position in this utility would override
+     Tailwind's positioning class and pull the host into document flow. */
   .hud-edge-fade::after {
     content: '';
     position: absolute;
@@ -225,8 +271,8 @@
     background: linear-gradient(
       to bottom,
       transparent,
-      oklch(1 0 0 / 16%) 30%,
-      oklch(1 0 0 / 16%) 70%,
+      oklch(from var(--accent-live) l c h / 24%) 30%,
+      oklch(from var(--accent-live) l c h / 24%) 70%,
       transparent
     );
     -webkit-mask:
@@ -241,7 +287,7 @@
   /* Additive legibility vignette over the stage's far edges — z:10 per the
      Phase 3 z-layer table, pointer-events-none. */
   .hud-vignette {
-    background: radial-gradient(ellipse at 50% 45%, transparent 45%, oklch(0.04 0.01 235 / 60%) 100%);
+    background: radial-gradient(ellipse at 50% 45%, transparent 48%, oklch(0.05 0.03 270 / 45%) 100%);
   }
 }
 
@@ -276,6 +322,17 @@
   }
 }
 
+@keyframes enter-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 /* Idle pulse for the core placeholder and status dots */
 @keyframes core-pulse {
   0%,
@@ -298,7 +355,8 @@
 @media (prefers-reduced-motion: reduce) {
   .enter-fade-up,
   .enter-fade,
-  .enter-scale-in {
+  .enter-scale-in,
+  .enter-slide-left {
     animation: none;
     opacity: 1;
     transform: none;

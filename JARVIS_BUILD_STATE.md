@@ -172,6 +172,28 @@ Commits `97e15af` (stage + environment + glass utils), `4958ce4` (HUD layout +
 deletions), pushed to `origin/jarvis-build`. Next: Chunk C (Arc Reactor
 assembly + bloom composer + camera re-centering, §7.3).
 
+**Chunk B visual redesign: SHIPPED** (2026-07-11). Yash's "monochrome/boring/
+dated" verdict resolved via a real Fable design review (model fable, design
+skills invoked) of live screenshots, which returned 12 exact fixes — all
+applied: `.hud-glass` rebuilt as gradient glass (cyan-to-indigo tint,
+saturate(140%), specular top inset, tinted hairline, drop shadow) +
+`.hud-glass-accent-edge` light-catch; violet `.hud-atmosphere` grade behind
+the Canvas + recolored vignette/scrim; `--background` to oklch(0.13 0.018
+255); starfield per-vertex temperature palette (ice/warm/violet), grid
+uOpacity 0.14 + 4th-line major pass, dust 96/0.18/0.16, fog 0x0b0d14;
+placeholder reactor dressed (smooth detail-4 core, additive halo sprite,
+dark-metal torus, 12° tilt); gold micro-accents (wordmark `/`, readout `//`);
+chat dock input capsule + filled live-accent SEND + tinted MIC/chips +
+borderless messages; status-bar glowing dots, ghost settings, display-font
+wordmark; edge-rail hover/active accent washes; panel overlay enter-slide-left
++ two-tone headers; feed rows borderless with hairlines. BUG FIXED during
+this pass: `.hud-glass-accent-edge`/`.hud-edge-fade` utilities set
+`position: relative`, overriding Tailwind's `fixed`/`absolute` (same
+specificity, later in sheet) — overlay panels rendered bottom-LEFT clipped;
+positioning declarations removed from both utilities, panels verified opening
+on the right (Yash confirmed live). Gates: typecheck 0 errors, build green,
+before/after screenshots captured. Next: Chunk C.
+
 ## Next Step
 
 **Phase 2 — Design system: Arc Reactor identity** (`tasks/PLAN.md` §3):

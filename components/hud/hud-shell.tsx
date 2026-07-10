@@ -148,7 +148,7 @@ export function HudShell({ isDesktop }: { isDesktop: boolean }) {
         continuous/per-frame animation, so the residual cost is negligible.
       */}
       <div
-        className="hud-glass hud-edge-fade pointer-events-auto absolute left-3 top-24 z-20 flex flex-col overflow-hidden rounded-[var(--radius-xl)]"
+        className="hud-glass hud-glass-accent-edge hud-edge-fade pointer-events-auto absolute left-3 top-24 z-20 flex flex-col overflow-hidden rounded-[var(--radius-xl)]"
         style={{
           width: chatCollapsed ? '48px' : '400px',
           bottom: '12px',
@@ -158,8 +158,8 @@ export function HudShell({ isDesktop }: { isDesktop: boolean }) {
       >
         <div className="flex items-center justify-between px-3 py-2">
           {!chatCollapsed && (
-            <h2 className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-              agent // chat
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.22em] text-foreground/80">
+              agent <span className="text-muted-foreground">{'// chat'}</span>
             </h2>
           )}
           <button

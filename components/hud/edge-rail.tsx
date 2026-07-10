@@ -62,7 +62,9 @@ export function EdgeRail({
             aria-pressed={isActive}
             title={vertical ? `${label} · ${hotkey}` : label}
             className={`relative flex size-10 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-              isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+              isActive
+                ? 'bg-[oklch(from_var(--accent-live)_l_c_h_/_12%)] text-primary'
+                : 'text-muted-foreground hover:bg-[oklch(from_var(--accent-live)_l_c_h_/_8%)] hover:text-foreground'
             }`}
           >
             {isActive && (
