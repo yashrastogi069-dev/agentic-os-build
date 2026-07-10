@@ -83,6 +83,20 @@ review/verification passes after 2-3 phases instead of per-phase.
   `Get-NetTCPConnection -LocalPort 3100` + `Stop-Process` (bash job control
   does not span tool calls).
 
+## Phase 3 progress
+
+**Chunk A — Theme engine: SHIPPED** (2026-07-10). `lib/theme-engine.ts`
+(zustand store, canonical `CoreState`, idle drift + 240ms quintic snap to
+state hues 213/75/195, 10Hz `--accent-live` writer, OKLCH->sRGB helper) +
+`components/theme-engine-provider.tsx` (rAF loop, reduced-motion +
+visibilitychange), mounted in `app/layout.tsx`; `app/page.tsx` dual-writes
+`coreState` (old UI untouched). Gate: typecheck/build green; live-browser
+check confirmed `--accent-live` drifting at idle, frozen at 213.00 under
+forced reduced-motion, snapping to 75.00 within 300ms of a real chat send.
+Commits `944aa1e`, `c2c0efe` (also tracked previously-uncommitted
+`tasks/PHASE3_DESIGN.md`), pushed to `origin/jarvis-build`. Next: Chunk B
+(stage + HUD restructure, `tasks/PHASE3_DESIGN.md` §7.2).
+
 ## Next Step
 
 **Phase 2 — Design system: Arc Reactor identity** (`tasks/PLAN.md` §3):
