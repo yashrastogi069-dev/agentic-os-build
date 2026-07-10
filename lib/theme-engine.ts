@@ -198,12 +198,24 @@ export const themeEngine = createThemeEngine()
 // OKLCH -> sRGB (Björn Ottosson's OKLab conversion), for R3F material colors.
 // ---------------------------------------------------------------------------
 
+function gammaEncode(v: number): number {
+  const clamped = v < 0 ? 0 : v > 1 ? 1 : v
+  return clamped <= 0.0031308 ? 12.92 * clamped : 1.055 * Math.pow(clamped, 1 / 2.4) - 0.055
+}
+
 /**
- * Converts an OKLCH color to gamma-encoded sRGB channels in [0, 1] — ready
- * for `threeColor.setRGB(r, g, b, THREE.SRGBColorSpace)` on a scratch
- * THREE.Color, since THREE.Color.setStyle() cannot parse oklch() strings.
+ * Core OKLCH -> sRGB conversion, writing into a caller-owned `out` object
+ * instead of allocating. This is the zero-allocation entry point scene code
+ * (jarvis-stage.tsx, environment.tsx, and Chunk C/D's arc-reactor.tsx /
+ * neural-network.tsx) should call from inside `useFrame`, per the Phase 3
+ * perf budget (§5: "Zero per-frame allocations in useFrame").
  */
-export function oklchToSrgb(l: number, c: number, hueDeg: number): { r: number; g: number; b: number } {
+function oklchToSrgbInto(
+  l: number,
+  c: number,
+  hueDeg: number,
+  out: { r: number; g: number; b: number },
+): void {
   const hRad = (hueDeg * Math.PI) / 180
   const a = c * Math.cos(hRad)
   const b = c * Math.sin(hRad)
@@ -222,15 +234,41 @@ export function oklchToSrgb(l: number, c: number, hueDeg: number): { r: number; 
   const gLin = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3
   const bLin = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3
 
-  const toGamma = (v: number) => {
-    const clamped = v < 0 ? 0 : v > 1 ? 1 : v
-    return clamped <= 0.0031308 ? 12.92 * clamped : 1.055 * Math.pow(clamped, 1 / 2.4) - 0.055
-  }
+  out.r = gammaEncode(rLin)
+  out.g = gammaEncode(gLin)
+  out.b = gammaEncode(bLin)
+}
 
-  return { r: toGamma(rLin), g: toGamma(gLin), b: toGamma(bLin) }
+/**
+ * Converts an OKLCH color to gamma-encoded sRGB channels in [0, 1] — ready
+ * for `threeColor.setRGB(r, g, b, THREE.SRGBColorSpace)` on a scratch
+ * THREE.Color, since THREE.Color.setStyle() cannot parse oklch() strings.
+ *
+ * Allocates a small result object each call — fine for one-off reads, but
+ * NOT for `useFrame`/rAF hot paths. Use `writeLiveAccentSrgb` there instead.
+ */
+export function oklchToSrgb(l: number, c: number, hueDeg: number): { r: number; g: number; b: number } {
+  const out = { r: 0, g: 0, b: 0 }
+  oklchToSrgbInto(l, c, hueDeg, out)
+  return out
 }
 
 /** The live theme accent (fixed L/C, live hue) as sRGB channels. */
 export function liveAccentSrgb(hue: number): { r: number; g: number; b: number } {
   return oklchToSrgb(THEME_L, THEME_C, hue)
+}
+
+/**
+ * Zero-allocation variant of `liveAccentSrgb` for `useFrame`/rAF hot paths:
+ * mutates a caller-owned scratch object instead of returning a new one.
+ *
+ *   const rgb = useMemo(() => ({ r: 0, g: 0, b: 0 }), [])
+ *   const color = useMemo(() => new THREE.Color(), [])
+ *   useFrame(() => {
+ *     writeLiveAccentSrgb(useThemeStore.getState().hue, rgb)
+ *     color.setRGB(rgb.r, rgb.g, rgb.b, THREE.SRGBColorSpace)
+ *   })
+ */
+export function writeLiveAccentSrgb(hue: number, out: { r: number; g: number; b: number }): void {
+  oklchToSrgbInto(THEME_L, THEME_C, hue, out)
 }

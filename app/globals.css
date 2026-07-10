@@ -180,6 +180,69 @@
   .enter-scale-in {
     animation: enter-scale-in var(--duration-fast) var(--ease-out-expo) both;
   }
+
+  /* HUD glass — Phase 3 §1.2/§6. Chrome-less floating surface for the chat
+     dock, edge rail, and overlay panels. No border: glass reads as an open
+     surface, not a boxed grid cell (Phase 3's explicit anti-boxing rule). */
+  .hud-glass {
+    background: oklch(0.13 0.01 235 / 62%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  /* Near-opaque variant of .hud-glass for surfaces that must fully occlude
+     readable content behind them. The <1024px fullscreen panel overlay sits
+     directly over the status strip + chat transcript (real text), not the
+     abstract 3D stage — 62% alpha there let that text bleed through and
+     visually collide with the panel's own header, a legibility violation
+     per Phase 3 §8.5. Kept as a distinct token rather than raising
+     .hud-glass's alpha globally, since the desktop glass-over-starfield
+     look is intentionally lighter. */
+  .hud-glass-solid {
+    background: oklch(0.1 0.01 235 / 97%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  /* Top-edge scrim — legibility gradient behind the un-boxed status strip
+     (status-bar.tsx no longer has its own border/background). */
+  .hud-scrim-top {
+    background: linear-gradient(to bottom, oklch(0.1 0.01 235 / 85%), transparent);
+  }
+
+  /* A single soft 1px light edge on the right side only — the chat dock's
+     "border" per spec: a faded gradient line, not a hard divider. */
+  .hud-edge-fade {
+    position: relative;
+  }
+
+  .hud-edge-fade::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      oklch(1 0 0 / 16%) 30%,
+      oklch(1 0 0 / 16%) 70%,
+      transparent
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    clip-path: inset(0 0 0 calc(100% - 1px));
+    pointer-events: none;
+  }
+
+  /* Additive legibility vignette over the stage's far edges — z:10 per the
+     Phase 3 z-layer table, pointer-events-none. */
+  .hud-vignette {
+    background: radial-gradient(ellipse at 50% 45%, transparent 45%, oklch(0.04 0.01 235 / 60%) 100%);
+  }
 }
 
 @keyframes enter-fade-up {
