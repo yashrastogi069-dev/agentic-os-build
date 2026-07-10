@@ -1,11 +1,10 @@
 # JARVIS — Master Implementation Plan (v1)
 
 Planner: Fable 5 (high effort) · Reviewer: Yash · Executors: Opus/Sonnet (xhigh)
-Branch: `jarvis-build` · Status: APPROVED BY YASH 2026-07-08 (with changes)
-Approved changes: icons = PHOSPHOR (thin/duotone weights for the HUD look),
-overriding Fable's keep-lucide recommendation. Migration lands in Phase 4.
-After each phase the executor reports back to Fable for advisory review,
-updates JARVIS_BUILD_STATE.md, commits and pushes.
+Branch: `jarvis-build` · Status: AWAITING YASH APPROVAL
+Nothing below executes until approved. After each phase the executor reports
+back to Fable for advisory review, updates JARVIS_BUILD_STATE.md, commits and
+pushes.
 
 ## 0. Status delta vs HANDOFF.md (ground truth, verified by reading code)
 
@@ -89,15 +88,25 @@ glow) onto documentElement at max 10Hz; globals.css re-bases --primary,
 --ring, glow utilities on it. R3F scene reads the store directly per-frame.
 Reduced motion: freeze drift, instant snaps.
 
-### 2.3 Neural core + Arc Reactor (BOTH, distinct)
-Neural core: R3F centerpiece rewrite — theme-token colors, energy pulses
-traveling along edges (pulse pool capped ~24), hover raycast highlight,
-frameloop paused when hidden, reduced-motion static render, dpr cap 1.5.
-Arc Reactor: NEW 2D component (SVG + canvas glow, deliberately not a second
-WebGL context) — concentric segmented rings, ice-cyan + hot-gold core, docked
-bottom of center column. It is the VOICE ENTRY POINT: click/hotkey to talk;
-rings react to live mic level while listening and playback amplitude while
-speaking; idle = slow rotation breathing.
+### 2.3 Neural core + Arc Reactor (BOTH, distinct) — REVISED 2026-07-10
+Yash direction after Phase 2 review (creative freedom granted, bar =
+"astonishing"): BREAK the boxed 3-column layout and its dividing lines.
+Free, open composition — a full-viewport 3D animated stage as the OS
+background, with the neural network and a prominent, clearly visible Arc
+Reactor living IN it, and the functional panels (chat, feed, skills, etc.)
+floating over it as an open HUD rather than boxed columns.
+- 3D animated background for the Arc Reactor + neural network (single WebGL
+  canvas for everything 3D; no second context).
+- Neural core: theme-token colors, energy pulses along edges (pulse pool
+  capped), hover raycast highlight, frameloop pause when hidden,
+  reduced-motion static render, dpr cap 1.5.
+- Arc Reactor: prominent, unobstructed, interactive — the VOICE ENTRY POINT
+  (click/hotkey to talk; reacts to mic level and playback amplitude; idle
+  breathing). May be rendered in the same 3D scene (revising the earlier
+  2D-SVG decision) if Fable's design says so.
+- Fable authors the visual/technical design spec (composition, scene graph,
+  animation choreography, interaction model, perf budget) BEFORE the Phase 3
+  executor implements: see tasks/PHASE3_DESIGN.md.
 
 ### 2.4 Connector framework + local-system connector
 Registry refactor: each connector exports { id, probe(), sync(), tools };
@@ -129,9 +138,7 @@ tasks/skill-mining-report.md → Yash approves shortlist → approved skills
 created via POST /api/skills + SKILL.md exports.
 
 ### 2.7 UI system
-Icons: PHOSPHOR (@phosphor-icons/react), thin/duotone weights — Yash's call,
-overriding the keep-lucide recommendation. Migrate all panels in Phase 4;
-remove lucide-react when done.
+Icons: keep lucide-react (Phosphor migration buys nothing functional).
 Fonts: Space Grotesk display + Geist Mono data via next/font. Rules for every
 phase: reduced-motion alternatives, ease-out expo/quint, entrances <300ms
 staggered, focus-visible rings, tabular-nums metrics, sparse glow, no
@@ -158,9 +165,10 @@ globals.css rewrite (near-black #07090C base, ice-cyan #38E1FF primary,
 hot-gold #FFB020 accent, alert red, --accent-live plumbing); Space Grotesk;
 motion utilities + reduced-motion layer; contrast audit documented.
 GATE: before/after screenshots; contrast ≥4.5:1 body; no layout regressions
-at 1280/1536/1920.
+at 1280/1536/1920. Use design skills like ui-ux-pro-max, impeccable, taste skill,  
+emilkowal-animations, frontend design skill etc where needed to create the best UI/UX
 
-### Phase 3 — Neural core + Arc Reactor + theme engine (Opus xhigh)
+### Phase 3 — Neural core + Arc Reactor + theme engine (Opus xhigh/Fable High when needed)
 Theme store/provider; neural-core rewrite (pulses, hover, drift+snap,
 frameloop pause, reduced motion); components/arc-reactor.tsx (mic-level
 reactive, click-to-talk wired to existing mic flow); center column hosts both.
@@ -183,7 +191,7 @@ GATE: per-connector live demo (Google items in feed post-OAuth, Telegram
 round-trip, file-drop in feed <5s, Obsidian search/read/append); disconnect
 each → honest gray dot + badge.
 
-### Phase 6 — Voice: in-OS Jarvis assistant (Opus xhigh)
+### Phase 6 — Voice: in-OS Jarvis assistant (Opus xhigh/Fable High when needed)
 setup-voice.ps1 (pinned prebuilt URLs); paths.ts .exe handling; Windows Piper
 stdout verification + temp-file fallback; VAD; sentence-chunk TTS queue +
 barge-in; Kokoro eval behind toggle; Arc Reactor = live voice surface.

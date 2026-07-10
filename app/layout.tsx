@@ -1,9 +1,16 @@
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist, Geist_Mono, Space_Grotesk } from 'next/font/google'
 import './globals.css'
 
+// Body / UI text.
 const geistSans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
+// Data / mono readouts (status bar, HUD figures). Kept as-is on purpose.
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
+// Display: headings, brand wordmark, big numbers. Exposed as --font-display.
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-space-grotesk',
+})
 
 export const metadata: Metadata = {
   title: 'Agentic OS',
@@ -40,7 +47,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`dark bg-background ${geistSans.variable} ${geistMono.variable}`}>
+    <html
+      lang="en"
+      className={`dark bg-background ${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable}`}
+    >
       <body className="font-sans antialiased">
         {children}
       </body>

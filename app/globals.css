@@ -40,6 +40,7 @@
   --color-warning: var(--warning);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: var(--font-space-grotesk), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -50,47 +51,64 @@
 }
 
 /*
-  Agentic OS — dark HUD command center.
-  Palette (4 colors): near-black base, panel gray, cyan glow (primary),
-  amber (warning). Text = off-white neutrals derived from base.
+  JARVIS — Arc Reactor identity (Phase 2, OKLCH token system).
+  Near-black base (#07090C family, a whisper of cyan hue so it never reads
+  pure black-and-white), ice-cyan core (#38E1FF) = --primary, hot-gold
+  (#FFB020) = --accent (used sparingly, glow reserved). Success shifts the
+  cyan toward green; warning shifts the gold. Alert red kept near legacy.
+
+  WCAG contrast (rigorous sRGB relative luminance, verified in
+  scripts/verify-contrast.mjs — both mandated pairs >= 4.5:1):
+    foreground / background       17.38:1  (mandated >= 4.5)  PASS
+    card-foreground / card        16.36:1  (mandated >= 4.5)  PASS
+    muted-foreground / card        6.62:1                     PASS
+    muted-foreground / background  7.03:1                     PASS
+    primary / background          12.62:1                     PASS
+    primary-foreground / primary  12.36:1                     PASS
+    accent-foreground / accent    10.31:1                     PASS
+    destructive / background       4.96:1                     PASS
 */
 :root,
 .dark {
   color-scheme: dark;
-  --background: oklch(0.14 0.012 240);
-  --foreground: oklch(0.9 0.008 210);
-  --card: oklch(0.18 0.014 240);
-  --card-foreground: oklch(0.9 0.008 210);
-  --popover: oklch(0.18 0.014 240);
-  --popover-foreground: oklch(0.9 0.008 210);
-  --primary: oklch(0.82 0.13 200);
-  --primary-foreground: oklch(0.15 0.02 230);
-  --secondary: oklch(0.24 0.016 240);
-  --secondary-foreground: oklch(0.9 0.008 210);
-  --muted: oklch(0.22 0.014 240);
-  --muted-foreground: oklch(0.62 0.012 220);
-  --accent: oklch(0.26 0.03 210);
-  --accent-foreground: oklch(0.88 0.09 200);
+  /* Phase 3 theme engine overwrites --accent-live via JS; the ring + glow
+     utilities read it so the whole UI follows the live core color. */
+  --accent-live: var(--primary);
+
+  --background: oklch(0.145 0.008 235);
+  --foreground: oklch(0.955 0.006 220);
+  --card: oklch(0.185 0.01 235);
+  --card-foreground: oklch(0.955 0.006 220);
+  --popover: oklch(0.175 0.01 235);
+  --popover-foreground: oklch(0.955 0.006 220);
+  --primary: oklch(0.84 0.136 213);
+  --primary-foreground: oklch(0.16 0.02 235);
+  --secondary: oklch(0.245 0.012 235);
+  --secondary-foreground: oklch(0.955 0.006 220);
+  --muted: oklch(0.225 0.01 235);
+  --muted-foreground: oklch(0.685 0.013 220);
+  --accent: oklch(0.813 0.165 75);
+  --accent-foreground: oklch(0.18 0.03 70);
   --destructive: oklch(0.62 0.19 25);
-  --success: oklch(0.75 0.15 160);
-  --warning: oklch(0.78 0.14 75);
-  --border: oklch(1 0 0 / 9%);
-  --input: oklch(1 0 0 / 13%);
-  --ring: oklch(0.82 0.13 200 / 55%);
-  --chart-1: oklch(0.82 0.13 200);
-  --chart-2: oklch(0.75 0.15 160);
-  --chart-3: oklch(0.78 0.14 75);
-  --chart-4: oklch(0.62 0.012 220);
-  --chart-5: oklch(0.45 0.05 220);
+  --success: oklch(0.75 0.14 165);
+  --warning: oklch(0.8 0.15 80);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(from var(--accent-live) l c h / 55%);
+  --chart-1: oklch(0.84 0.136 213);
+  --chart-2: oklch(0.813 0.165 75);
+  --chart-3: oklch(0.75 0.14 165);
+  --chart-4: oklch(0.62 0.16 285);
+  --chart-5: oklch(0.55 0.08 230);
   --radius: 0.5rem;
-  --sidebar: oklch(0.16 0.013 240);
-  --sidebar-foreground: oklch(0.9 0.008 210);
-  --sidebar-primary: oklch(0.82 0.13 200);
-  --sidebar-primary-foreground: oklch(0.15 0.02 230);
-  --sidebar-accent: oklch(0.24 0.016 240);
-  --sidebar-accent-foreground: oklch(0.9 0.008 210);
-  --sidebar-border: oklch(1 0 0 / 9%);
-  --sidebar-ring: oklch(0.82 0.13 200 / 55%);
+  --sidebar: oklch(0.165 0.009 235);
+  --sidebar-foreground: oklch(0.955 0.006 220);
+  --sidebar-primary: oklch(0.84 0.136 213);
+  --sidebar-primary-foreground: oklch(0.16 0.02 235);
+  --sidebar-accent: oklch(0.245 0.012 235);
+  --sidebar-accent-foreground: oklch(0.955 0.006 220);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(from var(--accent-live) l c h / 55%);
 }
 
 @layer base {
@@ -103,6 +121,33 @@
 }
 
 @layer utilities {
+  /* Motion tokens — shared easing + duration contract for every phase.
+     ease-out-expo / ease-out-quint per the impeccable motion rules;
+     entrances stay under 300ms with a coherent fast/base/slow scale. */
+  :root {
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out-quint: cubic-bezier(0.83, 0, 0.17, 1);
+    --duration-fast: 150ms;
+    --duration-base: 250ms;
+    --duration-slow: 400ms;
+  }
+
+  /* Typography roles (Tailwind v4 also generates `font-display` from the
+     @theme --font-display token). Use `.display` for headings / brand
+     wordmark, `.numeric` for big tabular figures / metrics, and the mono
+     font (`font-mono`) for HUD data readouts. Body text stays font-sans. */
+  .display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+
+  .numeric {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
   /* Faint HUD grid backdrop */
   .hud-grid {
     background-image:
@@ -111,12 +156,60 @@
     background-size: 48px 48px;
   }
 
+  /* Glow reserved for a few key elements. Reads --accent-live so Phase 3's
+     theme engine drives it in lockstep with the core color. */
   .glow-primary {
-    box-shadow: 0 0 24px oklch(0.82 0.13 200 / 18%);
+    box-shadow: 0 0 24px oklch(from var(--accent-live) l c h / 18%);
   }
 
   .text-glow {
-    text-shadow: 0 0 12px oklch(0.82 0.13 200 / 45%);
+    text-shadow: 0 0 12px oklch(from var(--accent-live) l c h / 45%);
+  }
+
+  /* Entrance utilities — all under 300ms, staggered by callers via
+     animation-delay. Every keyframe utility below has a reduced-motion
+     override further down (mandatory). */
+  .enter-fade-up {
+    animation: enter-fade-up var(--duration-base) var(--ease-out-expo) both;
+  }
+
+  .enter-fade {
+    animation: enter-fade var(--duration-base) var(--ease-out-quint) both;
+  }
+
+  .enter-scale-in {
+    animation: enter-scale-in var(--duration-fast) var(--ease-out-expo) both;
+  }
+}
+
+@keyframes enter-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes enter-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes enter-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -135,4 +228,22 @@
 
 .animate-core-pulse {
   animation: core-pulse 3.2s ease-in-out infinite;
+}
+
+/* Reduced-motion: disable/neutralize every keyframe-driven utility.
+   Mandatory per Yash's hard rule and the impeccable motion section. */
+@media (prefers-reduced-motion: reduce) {
+  .enter-fade-up,
+  .enter-fade,
+  .enter-scale-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .animate-core-pulse {
+    animation: none;
+    opacity: 0.85;
+    transform: none;
+  }
 }

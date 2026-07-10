@@ -59,7 +59,17 @@ iteration. Add a new entry after ANY correction from Yash.
    exists, default to it in recommendations rather than optimizing for least
    effort.
 
-11. **Batch verification, keep momentum (Yash 2026-07-09, during Phase 1).**
+11. **Visible transformation is the bar (Yash 2026-07-10, after Phase 2).**
+    Yash reviewed the Phase 2 token pass and said "it looks same as the old
+    one." Token-only changes read as no change to him. Every design phase
+    must produce an OBVIOUS visual leap. Specifically ordered: break the
+    boxed 3-column layout and its dividing lines — free, open composition;
+    the Arc Reactor must be prominently, clearly visible; add a 3D animated
+    background for the Arc Reactor + neural network; creative freedom granted
+    with "astonishing results" as the bar. Fable designs the visual core
+    (Arc + network + engine), executors implement.
+
+12. **Batch verification, keep momentum (Yash 2026-07-09, during Phase 1).**
     Yash stopped a mid-phase verification probe: complete 2-3 phases of major
     work first, then do the review/verification pass midway or at the end —
     don't stall a run on exhaustive per-phase probing. Record exactly which
