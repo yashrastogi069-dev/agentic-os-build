@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import type { CoreState } from '@/components/core-stage'
+import type { CoreState } from '@/lib/theme-engine'
 import { WavRecorder } from '@/lib/voice/recorder'
 
 type VoiceState = 'off' | 'recording' | 'transcribing' | 'speaking'

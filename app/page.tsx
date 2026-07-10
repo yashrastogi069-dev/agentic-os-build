@@ -1,97 +1,58 @@
 'use client'
 
-import { useState } from 'react'
-import { StatusBar } from '@/components/status-bar'
-import { CoreStage, type CoreState } from '@/components/core-stage'
-import { useThemeStore } from '@/lib/theme-engine'
-import { ChatPanel } from '@/components/chat-panel'
-import { FeedPanel } from '@/components/feed-panel'
-import { MemoryPanel } from '@/components/memory-panel'
-import { NotesPanel } from '@/components/notes-panel'
-import { SkillsPanel } from '@/components/skills-panel'
-import { SettingsPanel } from '@/components/settings-panel'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { HudShell } from '@/components/hud/hud-shell'
+import { Poster } from '@/components/scene/poster'
 
-type RightTab = 'feed' | 'notes' | 'memory' | 'skills' | 'settings'
+// The 3D stage is client-only (WebGL). Lazy + a mount guard keeps server
+// rendering intact (no next/dynamic ssr:false bail-out — see the same note
+// in the Chunk A-era core-stage.tsx this file replaces) while excluding
+// three.js from the server bundle and, on <1024px viewports, from the
+// client bundle too (the dynamic import below is only ever requested when
+// `isDesktop` is true).
+const JarvisStage = lazy(() =>
+  import('@/components/scene/jarvis-stage').then((mod) => ({ default: mod.JarvisStage })),
+)
+
+/** Tracks the same 1024px breakpoint Tailwind's `lg:` variant uses, so the
+ * stage-mount decision here and HudShell's layout switch never disagree. */
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(false)
+
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 1024px)')
+    setIsDesktop(mql.matches)
+    const onChange = () => setIsDesktop(mql.matches)
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
+  }, [])
+
+  return isDesktop
+}
 
 export default function Home() {
-  const [coreState, setCoreState] = useState<CoreState>('idle')
-  const [rightTab, setRightTab] = useState<RightTab>('feed')
+  const [mounted, setMounted] = useState(false)
+  const isDesktop = useIsDesktop()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
-    <main className="flex h-dvh flex-col bg-background text-foreground">
-      <StatusBar onOpenSettings={() => setRightTab('settings')} />
-
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-border lg:grid-cols-[minmax(0,4fr)_minmax(0,5fr)_minmax(0,4fr)]">
-        {/* Agent chat — left column */}
-        <section
-          aria-label="Agent chat"
-          className="flex min-h-0 flex-col bg-background lg:order-1"
-        >
-          <header className="border-b border-border px-3 py-2">
-            <h2 className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-              agent // chat
-            </h2>
-          </header>
-          <ChatPanel
-            onStateChange={(state) => {
-              // Dual-write (Phase 3 Chunk A, temporary): the old UI still
-              // reads coreState from this local useState via the CoreStage
-              // prop below, while the new zustand theme engine (driving
-              // --accent-live) reads it from the store. Chunk B removes the
-              // local useState and wires HudShell directly to the store.
-              setCoreState(state)
-              useThemeStore.getState().setCoreState(state)
-            }}
-          />
-        </section>
-
-        {/* Core stage — center, hidden on small screens to prioritize function */}
-        <section
-          aria-label="Core status"
-          className="hidden bg-background lg:order-2 lg:block"
-        >
-          <CoreStage state={coreState} />
-        </section>
-
-        {/* Right column: feed / memory / settings */}
-        <section
-          aria-label="Panels"
-          className="flex min-h-0 flex-col bg-background lg:order-3"
-        >
-          <header className="flex border-b border-border">
-            {(
-              [
-                ['feed', 'feed'],
-                ['notes', 'notes'],
-                ['memory', 'memory'],
-                ['skills', 'skills'],
-                ['settings', 'settings'],
-              ] as Array<[RightTab, string]>
-            ).map(([tab, label]) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setRightTab(tab)}
-                aria-pressed={rightTab === tab}
-                className={`flex-1 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.3em] transition-colors ${
-                  rightTab === tab
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </header>
-          <div className="min-h-0 flex-1">
-            {rightTab === 'feed' && <FeedPanel />}
-            {rightTab === 'notes' && <NotesPanel />}
-            {rightTab === 'memory' && <MemoryPanel />}
-            {rightTab === 'skills' && <SkillsPanel />}
-            {rightTab === 'settings' && <SettingsPanel />}
-          </div>
-        </section>
+    <main className="relative h-dvh overflow-hidden bg-background text-foreground">
+      {/* The stage — z-0, full-viewport, fixed. Phase 3 §1.1/§2. */}
+      <div className="fixed inset-0 z-0" aria-hidden="true">
+        {mounted && isDesktop ? (
+          <Suspense fallback={<Poster variant="fallback" />}>
+            <JarvisStage />
+          </Suspense>
+        ) : (
+          <Poster variant={mounted ? 'mobile' : 'fallback'} />
+        )}
       </div>
+
+      {/* The HUD — floats above the stage as open, chrome-less overlays. */}
+      <HudShell isDesktop={mounted && isDesktop} />
     </main>
   )
 }
