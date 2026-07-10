@@ -97,6 +97,30 @@ Commits `944aa1e`, `c2c0efe` (also tracked previously-uncommitted
 `tasks/PHASE3_DESIGN.md`), pushed to `origin/jarvis-build`. Next: Chunk B
 (stage + HUD restructure, `tasks/PHASE3_DESIGN.md` §7.2).
 
+**Chunk B — Stage + HUD restructure: SHIPPED** (2026-07-10). Single-Canvas
+WebGL stage (`components/scene/jarvis-stage.tsx`) with WebGL2/1 probe,
+visibility + reduced-motion frameloop control, and a placeholder emissive
+reactor; space environment (`environment.tsx`: dual starfields, fwidth
+anti-aliased shader grid floor with radial fade + live-accent color, additive
+dust); CSS poster fallback (`poster.tsx`) for <1024px and no-WebGL.
+`app/page.tsx` rewritten to the chrome-less open composition (fixed z-0 stage +
+`HudShell` above). `components/hud/`: `hud-shell.tsx` (collapsible 400px chat
+dock + Ctrl+B, single summoned overlay, Alt+1..5 hotkeys, focus return),
+`edge-rail.tsx` (five icons feed/notes/memory/skills/settings, shared by the
+desktop vertical rail and <1024px bottom tab-bar), `panel-overlay.tsx` (glass
+panel, focus trap, Esc/outside-click), `core-readout.tsx` (bottom state/health
+caption + reactor-hover affordance). globals.css HUD glass utilities added;
+status-bar container un-boxed; `theme-engine.ts` gained zero-alloc
+`writeLiveAccentSrgb`; `core-stage.tsx` + `neural-core.tsx` deleted.
+Gates: `pnpm typecheck` 0 errors, `pnpm build` green, dev server on :3100
+returned HTTP 200. Live Playwright verification at 1536px confirmed full-bleed
+space environment with NO boxed 3-column grid (glass + edge-fades only), chat
+dock + 5 rail icons + core readout all present; at 820px the single-column +
+bottom-tab-bar fallback with the dimmed CSS poster emblem renders correctly.
+Commits `97e15af` (stage + environment + glass utils), `4958ce4` (HUD layout +
+deletions), pushed to `origin/jarvis-build`. Next: Chunk C (Arc Reactor
+assembly + bloom composer + camera re-centering, §7.3).
+
 ## Next Step
 
 **Phase 2 — Design system: Arc Reactor identity** (`tasks/PLAN.md` §3):
