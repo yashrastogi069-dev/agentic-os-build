@@ -1,200 +1,229 @@
-# AGENTIC OS — Complete Handoff Document
+# JARVIS — Handoff Document
 
-A local-first personal AI operating system. Everything runs on your laptop: SQLite for memory, Ollama for embeddings, Groq for the brain, whisper.cpp + Piper for voice, and an MCP server so Claude Code can watch and operate the OS.
+Status as of **2026-07-11, ~04:25 IST**. This is the authoritative "where are
+we right now" map. For the forward plan see `tasks/PLAN.md` and
+`tasks/PHASE3_DESIGN.md`; for the standing rules see `CLAUDE.md` and
+`tasks/lessons.md`.
 
-**This document is the complete map of the project** — every file, all the logic, all setup steps. The actual source code lives in the project itself; see "How to get this code onto your machine" at the bottom.
+**Project:** a local-first personal AI operating system — "Jarvis." SQLite +
+sqlite-vec for memory, a multi-provider AI brain (no single-vendor lock-in),
+Ollama for embeddings, an MCP server so Claude Code can watch/operate the OS,
+and a from-scratch redesign into a real Iron-Man-style HUD: an open 3D stage
+with an interactive Arc Reactor and a color-driving neural network, replacing
+the original v0-generated boxed 3-column layout.
+
+**Origin:** cloned from a v0.dev export
+(`github.com/yashrastogi069-dev/agentic-os-build`, branch
+`v0/yashrastogi069-6856-5f5f7ef9`) into `Desktop/Jarvis`, now developed on a
+fresh branch **`jarvis-build`** — the only branch this project uses.
 
 ---
 
-## 1. What was built (all phases complete)
+## 1. What's fully built and working
 
-| Phase | Feature | Status |
+### Foundation (Phase 0)
+- Env provisioned (`.env.local`, gitignored): Gemini, Groq, OpenRouter,
+  NVIDIA, Tavily, Serper, Firecrawl keys live. `GITHUB_TOKEN` intentionally
+  empty (add a classic PAT to enable the GitHub connector).
+- `package.json` cleaned (renamed `jarvis`, dead fields removed,
+  `@vercel/analytics` removed — this is a local-first OS, not hosted).
+- `next.config.mjs`: `ignoreBuildErrors` removed (typecheck is genuinely
+  clean), `turbopack.root` set.
+- `pnpm-workspace.yaml`: `hono@4.12.25` override restored (CVE pin for
+  `mcp-handler`), `onlyBuiltDependencies` correct.
+- Ollama installed (0.31.1) and running locally with `nomic-embed-text`
+  pulled.
+
+### Brain rewire (Phase 1)
+- **`lib/providers.ts`** — failsafe chain: **Gemini 2.5 Flash → Groq Llama
+  3.3 70B → OpenRouter free rotation → NVIDIA NIM → Ollama local**.
+  Per-provider cooldowns on 429/5xx, `FORCE_DISABLE_PROVIDERS` test hook,
+  live status surfaced via `/api/health` and the status bar (`brain: <id>`).
+  Verified live: chat streams from Gemini, memory-save tool call round-trips
+  end-to-end, `webSearch` (Tavily→Serper) returns live results, failover to
+  Groq confirmed when Gemini is disabled.
+- **`lib/research.ts`** — `webSearch` + `fetchPage` (Firecrawl) added to the
+  agent's toolset, graceful degradation on failure.
+- Data correctness fixes: all timestamps unified to milliseconds
+  (`scripts/normalize-timestamps.mjs`, idempotent, backs up the DB first);
+  the `lib/skills.ts` analyzed-flag update bug (missing `.where()`, was
+  marking unrelated rows) fixed.
+- `app/api/chat` hardened: zod validation, 50-message history cap, honest
+  error responses instead of unhandled 500s.
+
+### Design system (Phase 2)
+- `app/globals.css` rewritten to the **Arc Reactor OKLCH palette**:
+  near-black `#07090C`-family base, ice-cyan `#38E1FF` primary, hot-gold
+  accent, a `--accent-live` CSS variable contract that Phase 3's theme
+  engine now drives in real time (`--ring`, `.glow-primary`, `.text-glow`
+  all derive from it).
+- Space Grotesk added as the display font (`next/font/google`), Geist Mono
+  kept for data/HUD readouts.
+- Motion token layer (`--ease-out-expo`, `--ease-out-quint`, duration
+  scale) with mandatory `prefers-reduced-motion` overrides on every
+  keyframe utility.
+- Contrast-verified (`scripts/verify-contrast.mjs`).
+
+### Existing connectors (pre-dated this build, confirmed present and honest)
+GitHub (PAT), Obsidian (Local REST API, vault indexing + browsing), Telegram
+(bot long-poll), Google (OAuth + Gmail/Calendar, read-only), Apple (iCloud
+CalDAV). All feed into the unified events feed with real
+"DISCONNECTED · SEED DATA" fallback badges when not configured — no fake
+data pretending to be live. **Not yet deep-audited or extended in this
+build** — that's Phase 5.
+
+### Skill Factory (pre-dated this build, confirmed present)
+Create/run/rate/refine skills, versioned refinement loop, SKILL.md export,
+GitHub deploy-to-repo. Usage-observation loop (`agent_runs` table,
+`/api/skills/discover`) already exists for auto-suggesting skills from
+behavior. **Not yet used for the big "mine 93 Claude session transcripts"
+task** — that's Phase 8, hasn't started.
+
+---
+
+## 2. Phase 3 — "The Stage": in progress, THIS is the current focus
+
+The big visual transformation: killing the old boxed 3-column grid entirely
+and replacing it with a full-viewport 3D scene (space environment, an
+interactive Arc Reactor, a color-driving neural network) with the
+functional UI floating over it as open glass HUD panels — no dividing
+lines. Full design spec: **`tasks/PHASE3_DESIGN.md`** (Fable-authored,
+Yash-approved, read it before touching scene/HUD code).
+
+Built as 4 sequential chunks, each independently gated (typecheck, build,
+live verification) and committed:
+
+| Chunk | Status | What it is |
 |---|---|---|
-| 1 | SQLite + sqlite-vec data layer, memory engine with Ollama embeddings | Done |
-| 1 | Agent chat (ToolLoopAgent: Groq default, Ollama fallback) | Done |
-| 1 | MCP server for Claude Code (8 tools) | Done |
-| 1 | Dark HUD command-center shell with honest service health dots | Done |
-| 1 | Seed-data fallback with "DISCONNECTED · SEED DATA" badges | Done |
-| 2 | GitHub connector (PAT) — repos, PRs, issues, notifications → feed | Done |
-| 2 | Obsidian connector (Local REST API) — vault indexing into memory | Done |
-| 2 | Obsidian notes panel — browse / search / read notes in the UI | Done |
-| 2 | Unified events feed + "brief me" | Done |
-| 3 | Voice loop: whisper.cpp STT → Groq → Piper TTS (all audio local) | Done |
-| + | 3D neural core (React Three Fiber) — movable, reacts to agent state | Done |
-| + | Skill Factory: create / run / rate skills, SKILL.md export | Done |
-| + | Loop Engine: run logging, feedback, versioned refinement | Done |
-| + | GitHub deploy: commits `.claude/skills/<name>/SKILL.md` to your repos | Done |
+| **A — Theme engine** | ✅ DONE, committed (`944aa1e`), pushed | `lib/theme-engine.ts` (zustand store), `components/theme-engine-provider.tsx` (rAF drift/snap loop), `--accent-live` writer. Live-verified: idle hue drifts continuously, snaps to state color on a real chat turn, freezes correctly under reduced-motion emulation. |
+| **B — Stage + HUD restructure** | ✅ DONE, committed (`97e15af`, `4958ce4`), pushed | `components/scene/jarvis-stage.tsx` (WebGL Canvas, space environment, placeholder reactor), `environment.tsx` (starfield/grid/dust), `poster.tsx` (no-WebGL/mobile CSS fallback), `components/hud/*` (hud-shell, edge-rail, panel-overlay, core-readout — the open glass layout), `app/page.tsx` fully rewritten, old `core-stage.tsx`/`neural-core.tsx` deleted. Live-verified via Playwright: full-bleed space environment, glass chat dock, edge rail with all 5 panel icons, `<1024px` responsive fallback, zero console errors, zero boxed borders. **However: see the open issue below — this passed every functional gate but Yash's live visual judgment is that it looks monochrome and dated, not futuristic.** |
+| **C — Arc Reactor** | ⏳ NOT STARTED | Full ring-assembly geometry (coil/mid/outer rings + precessing gyro rings, per `PHASE3_DESIGN.md` §2.2 — the *original* Fable design; a literal "exact Iron Man triangle" version was explored and explicitly reverted by Yash), bloom post-processing, click/hover-to-talk mic wiring. **Hard rule: Opus at xhigh effort only, no compromise** (pin `model:'opus'` explicitly — session-model inheritance caused a near-miss once already). |
+| **D — Neural network + choreography + perf** | ⏳ NOT STARTED | The lattice (140+24 instanced nodes, edge pulses), the full per-agent-state animation table (idle/listening/thinking/speaking — colors, rates, light intensity), the performance governor (auto quality-drop below 40fps), final reduced-motion/tab-hidden correctness. Same Opus-xhigh no-compromise rule. |
 
-Deferred (listed in README roadmap): Telegram / Google / Apple connectors, usage-pattern auto-discovery, Cloudflare Tunnel recipe.
+### Open issue blocking Chunk C/D start: Chunk B visual quality
 
----
+Yash's direct feedback after seeing Chunk B live: *"the hub has one colour
+only, it does not look futuristic/modern, the theme is very boring and
+old."* This is a real, unresolved problem — Chunk B is functionally
+correct but fails on taste. Working hypothesis (see `lessons.md` item 11a):
+the `.hud-glass` panels are likely too uniformly dark/desaturated at rest,
+so the Arc Reactor palette only reads through the 3D canvas and never
+reaches the HUD chrome itself.
 
-## 2. Complete file inventory and logic
+**This must be fixed FIRST, before Chunk C or D starts.** The required
+process (already written into `JARVIS_BUILD_STATE.md`'s NEXT STEPS):
+1. Start the dev server, take real screenshots.
+2. Run a genuine Fable design review of those screenshots — model `fable`,
+   high effort — explicitly invoking the `impeccable`, `ui-ux-pro-max`,
+   `emilkowal-animations`, and taste design skills, asking pointedly: does
+   this read as futuristic/modern/vibrant, or monochrome/boring/dated?
+3. Get concrete, specific fixes (exact color/opacity/gradient/accent
+   changes, not vague direction).
+4. Apply them, re-screenshot, confirm the improvement.
 
-### App shell
+Only after that redesign is confirmed does Chunk C begin.
 
-| File | What it does |
-|---|---|
-| `app/layout.tsx` | Root layout. Geist + Geist Mono fonts, `bg-background` on `<html>`, metadata ("Agentic OS"). |
-| `app/globals.css` | Tailwind v4 theme. Dark HUD tokens: near-black background (`oklch(0.13 0.02 240)`), cyan primary, amber accent. **Important:** tokens are defined under `:root, .dark` so the shadcn dark-mode layer can't override them. Custom `--success`/`--warning` tokens, scanline + glow utility classes. |
-| `app/page.tsx` | The dashboard. Left column: agent chat. Center: 3D neural core stage. Right column: tabbed panels (feed / notes / memory / skills / settings). Chat state drives the core animation via `onStateChange`. |
+### Yash's standing instructions for the rest of Phase 3
 
-### Components
-
-| File | Logic |
-|---|---|
-| `components/status-bar.tsx` | Polls `/api/health` via SWR (10s refresh). Renders a dot per service (db, ollama, groq, obsidian, github, whisper, piper): green = ok, gray = offline. Settings shortcut button. |
-| `components/core-stage.tsx` | Client-only wrapper (`next/dynamic`, `ssr: false`) around the 3D canvas. Exports `CoreState = 'idle' \| 'listening' \| 'thinking' \| 'speaking'`. |
-| `components/neural-core.tsx` | React Three Fiber scene. ~60 nodes on a fibonacci sphere, connected by distance-threshold edges. Nodes pulse, edges glow. Color/speed react to `CoreState`: cyan idle, green listening, amber fast-pulse thinking, blue speaking. OrbitControls = drag to rotate (the "movable" requirement). |
-| `components/chat-panel.tsx` | `useChat` from `@ai-sdk/react` with `DefaultChatTransport` → `/api/chat`. Quick-action chips ("brief me", etc.). **Voice loop:** mic button → `WavRecorder` → POST `/api/voice/transcribe` → sends transcript as chat message with `voiceReplyPending` flag → when the reply finishes streaming, POSTs the text to `/api/voice/speak` and plays the returned WAV. Voice state drives the neural core. |
-| `components/feed-panel.tsx` | SWR on `/api/feed` (60s refresh). "Sync" button POSTs to trigger connector pulls. Renders seed events with red "DISCONNECTED · SEED DATA" badge when `seeded: true` or fetch fails. |
-| `components/notes-panel.tsx` | Obsidian vault browser: directory listing with up-navigation, full-text search with snippets, markdown note reader. Talks to `/api/obsidian/notes`. Honest disconnected state with setup hint. |
-| `components/memory-panel.tsx` | Semantic search box → `/api/memories?q=...`. Lists memories with category/source/score. Seed fallback + badge like the feed. |
-| `components/skills-panel.tsx` | The Skill Factory UI. List view (status chip, version, run health) → detail view (instructions, run-with-input, run history with thumbs up/down rating, refine button showing proposed diff, deploy-to-GitHub form, SKILL.md preview). Create form for new skills. |
-| `components/settings-panel.tsx` | Connector config stored in SQLite via `/api/settings`: Obsidian (port + API key), GitHub (username), MCP key generate/revoke + copy-paste `claude mcp add` command, "index vault" button → `/api/obsidian/index`. |
-
-### Library (all server logic)
-
-| File | Logic |
-|---|---|
-| `lib/db/index.ts` | SQLite bootstrap at `data/agentic-os.db` (WAL mode). Loads sqlite-vec extension; sets `vecAvailable` flag. Idempotent DDL for all tables + `vec_memories` virtual table (768-dim). Connection cached on `globalThis` to survive HMR; `SCHEMA_VERSION` constant forces re-init when tables are added. |
-| `lib/db/schema.ts` | Drizzle schema: `memories` (content, category, source, timestamps), `events` (source, title, payload JSON, external_id for dedupe), `connector_settings` (per-connector JSON config), `skills` (name, description, instructions, source_task, status, version, deployed_to), `skill_runs` (skill_id, version, input, output, rating -1/0/1, feedback). |
-| `lib/memory.ts` | The memory engine. `saveMemory`: chunks text (~1200 chars, sentence-boundary), embeds each chunk via Ollama `nomic-embed-text`, stores vector in `vec_memories`. `recallMemory`: embeds query → sqlite-vec KNN (`vec_distance_cosine`) → falls back to FTS-style keyword LIKE scoring when Ollama or vec is unavailable. `listMemories`, `deleteMemory`. |
-| `lib/ollama.ts` | Thin fetch client for `http://127.0.0.1:11434`: `embed()` (nomic-embed-text), `isOllamaUp()` probe, model listing. |
-| `lib/agent.ts` | The brain. `runAgent`/`streamAgent` using AI SDK `ToolLoopAgent`. Model selection: Groq (`llama-3.3-70b-versatile` via `@ai-sdk/groq`) when `GROQ_API_KEY` is set, else Ollama `llama3.2:3b` via `@ai-sdk/openai-compatible`. Tools: memory (save/recall/list), feed (getUpdates, syncConnectors), skills (saveAsSkill, listSkills, runSkill), obsidian (searchNotes, readNote), github (repos, PRs, notifications). System prompt describes the OS and instructs the agent to offer skill-saving when it spots repeated tasks. |
-| `lib/skills.ts` | Skill Factory + Loop Engine. `createSkill`, `listSkills`, `getSkill`, `runSkill` (executes instructions + input through the brain, logs to `skill_runs`), `rateRun` (thumbs + feedback), `skillHealth` (run count / success rate), `refineSkill` (feeds negative runs to the brain → proposed revised instructions → `applyRefinement` bumps version), `generateSkillMd` (Claude-compatible SKILL.md with frontmatter), `deploySkillToGithub` (GitHub Contents API PUT to `.claude/skills/<name>/SKILL.md`, records deploy target + SHA). |
-| `lib/events.ts` | Unified feed store. `addEvent` (dedupes on `external_id`), `getRecentEvents` (optional source filter). |
-| `lib/connectors/github.ts` | PAT-authenticated GitHub API client: recent repos, PRs, issues, notifications. `syncGithubToFeed()` maps them into events. Probe for the health bar. |
-| `lib/connectors/obsidian.ts` | Local REST API client (`https://127.0.0.1:27123`, self-signed cert handled). List vault files, read note, search. `indexVaultToMemory()` walks all `.md` files → `saveMemory` per note. `syncObsidianToFeed()` records a daily vault snapshot event. |
-| `lib/settings.ts` | Read/write per-connector JSON config in `connector_settings` (Obsidian port/key, GitHub username, MCP API key). |
-| `lib/seed-data.ts` | Clearly `[seed]`-prefixed sample events and memories, shared by API fallbacks and client-side fetch-failure fallbacks. |
-| `lib/voice/paths.ts` | Resolves `bin/whisper`, `bin/piper`, `models/*.bin`, `models/*.onnx` paths + existence checks for health probes. |
-| `lib/voice/recorder.ts` | Browser `WavRecorder`: getUserMedia → AudioContext → 16kHz mono 16-bit PCM WAV blob (what whisper.cpp expects). |
-| `lib/utils.ts` | `cn()` class-name helper (default). |
-
-### API routes
-
-| Route | Logic |
-|---|---|
-| `app/api/chat/route.ts` | POST — streams the agent's `UIMessage` response for `useChat`. |
-| `app/api/[transport]/route.ts` | The MCP server (`mcp-handler`). Bearer-key auth against the stored MCP key. Tools: `search_memory`, `save_memory`, `get_updates_feed`, `get_agent_status`, `list_skills`, `run_skill`, `create_skill`, `get_skill_runs`. This is how Claude Code watches/operates the OS. |
-| `app/api/health/route.ts` | Probes every service (db + vec, Ollama, Groq key, Obsidian, GitHub, whisper/piper binaries) → status bar JSON. |
-| `app/api/memories/route.ts` | GET list/recall (seed fallback), POST save, DELETE. |
-| `app/api/feed/route.ts` | GET recent events (seed fallback), POST triggers GitHub + Obsidian sync. |
-| `app/api/obsidian/index/route.ts` | POST — index the whole vault into memory. |
-| `app/api/obsidian/notes/route.ts` | GET — browse dirs / read note / search vault. |
-| `app/api/settings/route.ts` | GET/POST connector settings, MCP key generation. |
-| `app/api/skills/route.ts` | GET list (with health), POST create. |
-| `app/api/skills/[id]/route.ts` | GET detail + runs + SKILL.md, POST actions: run, rate, refine, apply-refinement, deploy. |
-| `app/api/voice/transcribe/route.ts` | POST WAV body → writes temp file → spawns `bin/whisper` (tiny.en) → returns transcript text. |
-| `app/api/voice/speak/route.ts` | POST `{ text }` → spawns `bin/piper` → returns WAV audio. |
-
-### Scripts and config
-
-| File | Purpose |
-|---|---|
-| `scripts/setup-voice.sh` | Downloads/builds whisper.cpp + tiny.en model and Piper + voice model into `bin/` and `models/` (gitignored). |
-| `next.config.mjs` | **Critical:** `serverExternalPackages: ["better-sqlite3", "sqlite-vec"]` — without this Turbopack bundles the native modules and sqlite-vec breaks. |
-| `package.json` | Includes `pnpm.onlyBuiltDependencies: ["better-sqlite3"]` so pnpm builds the native module. |
-| `.env.example` | Template for your keys. |
-| `.gitignore` | Excludes `data/` (DB), `bin/`, `models/` (voice binaries). |
-| `README.md` | Full local setup guide. |
+- **Use Fable more actively on Chunks C and D** — not just as an emergency
+  contact for design ambiguities, but a real pre-flight design-refinement
+  pass before each chunk's executor builds, and a real advisory screenshot
+  review after each chunk completes.
+- **Hold point:** once the B redesign + Chunks C and D are all done,
+  **stop and wait for Yash's explicit approval** before starting Phase 4 or
+  anything further. Do not auto-advance past this checkpoint.
 
 ---
 
-## 3. Dependencies (exact)
+## 3. What's next after Phase 3 (approval-gated, not started)
 
-Runtime: `ai` v7, `@ai-sdk/groq`, `@ai-sdk/react`, `@ai-sdk/openai-compatible`, `better-sqlite3`, `sqlite-vec`, `drizzle-orm`, `zod` v4, `mcp-handler` + `@modelcontextprotocol/sdk@1.26.0`, `swr`, `three` + `@react-three/fiber` + `@react-three/drei`, `next` 16, `react` 19.
+Per `tasks/PLAN.md`'s phase plan — unchanged in substance, only Phase 3 has
+been elaborated/re-scoped:
 
-Dev: `@types/better-sqlite3`, `@types/three`, `drizzle-kit`, `tailwindcss` v4, `typescript` 5.7.
+- **Phase 4** — Shell & panels redesign: restyle every panel to the new
+  system, **migrate all icons from lucide-react to Phosphor**
+  (`@phosphor-icons/react`, thin/duotone — Yash's explicit call, overriding
+  Fable's "keep lucide" recommendation), registry-driven status dots
+  covering all connectors including the newer ones.
+- **Phase 5** — Connector framework refactor + Google/Telegram/local-system
+  depth: a proper `{id, probe(), sync(), tools}` registry, OAuth CSRF fix
+  (missing `state` param), a new local-system connector (filesystem watch,
+  no external keys), deeper Obsidian (daily-note append, auto-index).
+- **Phase 6** — Voice, mode 1: the in-OS Jarvis you talk to. Streaming
+  `mic → VAD → whisper.cpp STT → brain → sentence-chunked TTS → speaker`
+  with barge-in. Runs via Workflow at Opus xhigh (same no-compromise rule
+  as Phase 3). Windows-specific setup script needed (prebuilt whisper.cpp +
+  Piper binaries — the repo's existing `setup-voice.sh` is bash-only and
+  will not work as-is on Windows).
+- **Phase 7** — Voice, mode 2: a separate WhisperFlow-style global-dictation
+  utility (Python, system-wide hotkey, works in any Windows app — this is
+  necessarily a companion tool outside the Next.js app, browsers can't do
+  system-wide text injection).
+- **Phase 8** — Skill mining: fan out subagents across all ~93 Claude Code
+  session transcripts on this machine (`~/.claude/projects/**/*.jsonl`,
+  privacy-guarded extraction — never copy secrets/tokens verbatim), 
+  synthesize into ranked skill proposals, get Yash's sign-off, create the
+  approved ones in the Skill Factory.
+- **Phase 9** — Harden & ship: full regression pass, rewrite this document
+  and the README to match final reality, draft PR `jarvis-build → main`.
 
 ---
 
-## 4. Environment variables (`.env.local`)
+## 4. Known environment gotchas (don't rediscover these)
 
-```bash
-# The brain (free tier at console.groq.com)
-GROQ_API_KEY=gsk_...
+- **pnpm** is at `C:\Users\win 10\AppData\Roaming\npm\pnpm`, not
+  necessarily on PATH in every shell — use the full path or prepend it.
+- **Turbopack cache corruption**: repeatedly force-killing a dev server
+  mid-compile can corrupt `.next`, causing every subsequent compile of `/`
+  to hang indefinitely (not just slow). If a compile hangs past ~2 minutes
+  with no progress in the log, delete `.next` and retry before assuming a
+  code bug — this already happened once and wasted real debugging time.
+- **First compile of `/` is genuinely slow** (8s+ cold) because it's the
+  heaviest route (three.js/@react-three/fiber). This is normal, not a bug.
+- **Dev server runs on port 3100**, not the Next.js default 3000, to avoid
+  clashing with other local projects.
+- **Windows paths with spaces** (`win 10`): always use `spawn` without
+  `shell:true` in any code that shells out (voice binaries especially).
+- **Workflow `agent()` calls default to inheriting the session's current
+  model** — if you toggle `/model` mid-session, already-queued-but-not-yet-run
+  Workflow chunks can silently pick up the wrong model. Always pin
+  `model: 'opus'` explicitly for anything under the "no compromise" rule.
 
-# GitHub connector + skill deploy (classic PAT: repo + notifications scopes)
-GITHUB_TOKEN=ghp_...
+---
 
-# Optional overrides
-# OLLAMA_URL=http://127.0.0.1:11434
-# OBSIDIAN_PORT=27123
+## 5. File map (current, not the stale original)
+
+Key files added/changed by this build beyond the original v0 export:
+
+```
+CLAUDE.md                          session bootstrap + standing rules
+HANDOFF.md                         this file
+JARVIS_BUILD_STATE.md              cross-session resume contract (phase/chunk status)
+tasks/PLAN.md                      Fable's master build plan
+tasks/PHASE3_DESIGN.md             Fable's Phase 3 visual/technical spec
+tasks/lessons.md                   self-improvement log (every Yash correction)
+
+lib/providers.ts                   brain failsafe chain
+lib/research.ts                    webSearch / fetchPage agent tools
+lib/theme-engine.ts                zustand store driving the live OS accent color
+scripts/normalize-timestamps.mjs   one-time DB timestamp migration
+scripts/verify-contrast.mjs        Phase 2 contrast audit
+
+components/theme-engine-provider.tsx
+components/scene/jarvis-stage.tsx  the single WebGL canvas (env + reactor + network)
+components/scene/environment.tsx   starfield / grid floor / dust
+components/scene/poster.tsx        no-WebGL / mobile CSS fallback
+components/scene/arc-reactor.tsx   NOT YET BUILT (Chunk C)
+components/scene/neural-network.tsx NOT YET BUILT (Chunk D)
+components/hud/hud-shell.tsx       layout orchestrator (chat dock, hotkeys)
+components/hud/edge-rail.tsx       5-icon panel-summon rail
+components/hud/panel-overlay.tsx   summonable glass panel
+components/hud/core-readout.tsx    bottom state/health caption
+
+components/core-stage.tsx          DELETED (superseded by scene/*)
+components/neural-core.tsx         DELETED (superseded by scene/*)
 ```
 
-Obsidian API key and MCP key are stored in the DB via the settings panel, not env vars.
-
----
-
-## 5. Local setup (in order)
-
-```bash
-# 1. Get the code (see section 6), then:
-cd agentic-os
-pnpm install                        # builds better-sqlite3 native module
-
-# 2. Ollama (memory embeddings + offline fallback brain)
-#    install from https://ollama.com
-ollama pull nomic-embed-text        # required for memory
-ollama pull llama3.2:3b             # optional offline brain
-
-# 3. Keys
-cp .env.example .env.local          # then paste your GROQ_API_KEY, GITHUB_TOKEN
-
-# 4. Voice (optional, ~10 min)
-bash scripts/setup-voice.sh         # builds whisper.cpp + downloads Piper
-
-# 5. Obsidian (optional)
-#    Install the "Local REST API" community plugin in Obsidian,
-#    copy its API key into Settings tab -> Obsidian, then "index vault".
-
-# 6. Run
-pnpm dev                            # http://localhost:3000
-```
-
-Every status dot in the top bar turns green as each service comes online. Nothing lies: gray = actually offline.
-
-## Claude Code hookup
-
-In the OS: Settings tab → generate MCP key → copy the command shown:
-
-```bash
-claude mcp add agentic-os http://localhost:3000/api/mcp \
-  --header "Authorization: Bearer <your-key>"
-```
-
-Claude Code can then search/save memory, read your feed, list/run/create skills, and inspect skill run history.
-
----
-
-## 6. How to get this code onto your machine
-
-You do not need to copy-paste files manually — the v0 UI exports the entire project:
-
-**Option A — Download ZIP (fastest)**
-1. Click the **three dots (⋯)** in the top-right of the Block/Preview view in v0.
-2. Select **"Download ZIP"**.
-3. Unzip anywhere on your laptop → `cd` into it → follow section 5 above.
-
-**Option B — Push to GitHub (best for ongoing work)**
-1. Click the **settings/gear button** (top right) → **Git** section.
-2. Connect a GitHub repository — v0 pushes all project files to your repo branch.
-3. `git clone` it on your laptop → follow section 5.
-
-**Option C — shadcn CLI**
-Use the shadcn CLI command from the same three-dots menu to scaffold the project into an existing directory.
-
-All three include every file listed in section 2 (source, configs, scripts, README, this handoff). The gitignored `data/`, `bin/`, `models/` directories are created on your machine by running the app and the voice setup script.
-
----
-
-## 7. Sanity checklist after local install
-
-- `curl localhost:3000/api/health` → `db: { ok: true, vec: true }` and `ollama: true`
-- Chat: "remember that I prefer dark mode" → memory tab shows it (no seed badge)
-- Chat: "brief me" → agent pulls the feed
-- Skills tab → create a skill → run it → rate it → refine after a thumbs-down → deploy to a repo
-- Mic button: speak → transcript appears → reply is spoken back
-- Neural core: drag it; watch it change color while the agent thinks
+Everything else (API routes, connectors, memory engine, skill factory,
+MCP server) is the pre-existing build, functionally intact and not yet
+touched by the redesign except where noted above.

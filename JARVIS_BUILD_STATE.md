@@ -3,13 +3,64 @@
 Cross-session resume contract. Read this (and `tasks/PLAN.md`, `tasks/lessons.md`)
 before starting any new work on this project.
 
-## Current Phase
+## Current Phase (updated 2026-07-10 ~21:05 IST)
 
-**Phase 1 — Brain rewire + research chain: COMPLETE** (2026-07-09).
-Next executor starts **Phase 2 — Design system: Arc Reactor identity** per
-`tasks/PLAN.md` section 3. Yash's standing instruction (2026-07-09): run the
-next phases back-to-back with Opus (high) executors and batch the deep
-review/verification passes after 2-3 phases instead of per-phase.
+**Phase 0, 1, 2 COMPLETE. Phase 3 Chunks A + B COMPLETE and pushed**
+(commits through `cf476df`). Chunks C (Arc Reactor) and D (neural network +
+choreography + perf) NOT YET STARTED.
+
+**BLOCKED on Yash's Claude usage limit, resets ~1:12am IST 2026-07-10/11.**
+The session is chaining hourly ScheduleWakeup check-ins until reset, then
+resuming automatically. If you are a fresh session picking this up instead,
+do the NEXT STEPS below in order.
+
+### NEXT STEPS (in order) once budget is available
+
+1. **Fable visual design review of Chunk B — MANDATORY, do this FIRST,
+   before touching C/D.** Yash's live feedback (2026-07-10): "the hub has
+   one colour only, it does not look futuristic/modern, the theme is very
+   boring and old." Chunk B passed all functional gates (typecheck, build,
+   live DOM check, even a Playwright screenshot by its own executor) but
+   FAILED on taste/vibrancy. See `tasks/lessons.md` item 11a for full
+   context and the likely root cause hypothesis (`.hud-glass` panels too
+   uniformly dark/desaturated; the Arc Reactor palette only reads through
+   the 3D canvas, not through the HUD chrome itself).
+   - Start the dev server, take real screenshots (desktop widths).
+   - Run a Fable (model: fable, high effort) review of those screenshots
+     explicitly invoking design skills: `impeccable`, `ui-ux-pro-max`,
+     `emilkowal-animations`, and the taste-skill — asking specifically: is
+     this futuristic/modern/vibrant enough for an Iron-Man-Jarvis HUD, or
+     does it read as monochrome/boring/dated? Get concrete, actionable
+     fixes (not vague — exact opacity/color/gradient/accent-usage changes).
+   - Apply Fable's fixes via a Sonnet or Opus executor (scale to fix size).
+   - Re-screenshot and confirm the improvement before moving on.
+2. **Chunk C — Arc Reactor.** Opus + xhigh, NO COMPROMISE (Yash's explicit
+   hard rule) — pin `model: 'opus'` explicitly in any Workflow script (do
+   not rely on session-model inheritance, which caused a bug once already
+   when Yash was toggling `/model` mid-session). Use Fable MORE actively
+   here per Yash's 2026-07-10 instruction — not just as an emergency
+   contact for ambiguities, but a real pre-flight design-refinement pass
+   before the executor builds, and a real advisory screenshot review after.
+   Design per `tasks/PHASE3_DESIGN.md` section 2.2 (the ORIGINAL Fable ring
+   assembly — coil/mid/outer/gyro rings — Yash explicitly reverted the
+   "literal Iron Man triangle" idea, do NOT reintroduce it).
+3. **Chunk D — Neural network + choreography + perf.** Same Opus xhigh
+   no-compromise rule, same Fable-sandwich approach.
+4. A saved, ready-to-resume Workflow script for C+D already exists at
+   `tasks/PLAN.md`-referenced location — check for
+   `jarvis-phase3-stage-wf_*.js` under this session's workflow-scripts dir
+   first before writing a new one from scratch; if unavailable, rebuild
+   from `tasks/PHASE3_DESIGN.md` section 7 steps 3-4.
+5. **STOP AND WAIT FOR YASH'S APPROVAL after step 3 (Chunk D) completes.**
+   Yash's explicit instruction (2026-07-10 21:xx IST): once the Chunk B
+   redesign is done AND Chunks C and D are complete, do NOT auto-advance
+   into Phase 4 (panels + Phosphor icons) or anything further. Report full
+   results (screenshots, gate outcomes, Fable's design verdicts) and hold
+   the loop — do not call ScheduleWakeup to continue past this point without
+   a real user message approving it.
+
+Original Phase 1 handoff notes (still accurate, kept for reference) follow
+below.
 
 ## Phase 1 — what shipped
 

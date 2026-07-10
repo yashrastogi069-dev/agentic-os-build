@@ -59,6 +59,27 @@ iteration. Add a new entry after ANY correction from Yash.
    exists, default to it in recommendations rather than optimizing for least
    effort.
 
+11b. **Hold point after Chunk D (Yash 2026-07-10).** Once the Chunk B
+    redesign + Chunks C and D are done, STOP and wait for Yash's explicit
+    approval before starting Phase 4 or anything further. Do not
+    auto-advance the loop past this checkpoint.
+
+11a. **Functional gates are not a design gate (Yash 2026-07-10, after Chunk B).**
+    Chunk B passed typecheck/build/live-DOM-check and even a Playwright
+    screenshot review by its own executor, yet Yash's live impression was
+    "the hub has one colour only, it does not look futuristic/modern, the
+    theme is very boring and old." A phase can be functionally correct and
+    still fail on taste. FROM NOW ON: after any visual-phase chunk reports
+    "done," get an actual screenshot reviewed by FABLE specifically for
+    color/vibrancy/modern-futuristic feel (not just layout/contrast/motion
+    correctness) before declaring the phase complete — invoke design skills
+    (impeccable, ui-ux-pro-max, emilkowal-animations, taste) explicitly for
+    this pass. Likely root cause to check first: the HUD glass panels
+    (.hud-glass) may be too uniformly dark/desaturated at rest, with the
+    Arc Reactor palette only showing through the 3D scene and not enough in
+    the HUD chrome itself — the OS should feel alive in ITS chrome too, not
+    just in the 3D canvas.
+
 11. **Visible transformation is the bar (Yash 2026-07-10, after Phase 2).**
     Yash reviewed the Phase 2 token pass and said "it looks same as the old
     one." Token-only changes read as no change to him. Every design phase
