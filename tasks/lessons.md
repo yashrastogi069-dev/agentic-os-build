@@ -96,3 +96,30 @@ iteration. Add a new entry after ANY correction from Yash.
     don't stall a run on exhaustive per-phase probing. Record exactly which
     checks were deferred in JARVIS_BUILD_STATE.md so the batched review pass
     can pick them up. Executor conversations should run Opus (high).
+
+## 2026-07-11
+
+13. **The triangle is back IN (Yash 2026-07-11, explicit reversal).** During
+    Chunk C's live iteration Yash requested the Mark-VI triangular core
+    ("you can make the inner reactor a triangular") — this supersedes the
+    earlier "literal Iron Man triangle explored and reverted" note in
+    HANDOFF/PHASE3_DESIGN §2.2. Do not "correct" the triangle away later.
+
+14. **Iterate visuals against REAL reference images, not memory.** Three
+    rounds of Yash corrections on the coil segments ("boxes") and triangle
+    corners ended only after fetching an actual Mark VI prop photo and
+    matching structure to it (struts, clamps, wire-wound curved coils).
+    For any "make it look like the real X" task: fetch a photo of X first,
+    build against it. Higgsfield image-gen is the fallback when no real
+    photo exists (Yash offered an account; first one out of credits).
+
+15. **Tailwind v4 scans ALL non-gitignored text files.** A Windows path
+    with a backslash-hex segment (`...praxis\25b6cefd...`) written into a
+    project .md file parsed as an out-of-range CSS unicode escape and
+    hard-failed `pnpm build` ("Invalid code point"). Write such paths with
+    forward slashes in any tracked file.
+
+16. **EffectComposer drops renderer tone mapping.** Adding
+    @react-three/postprocessing's composer bypassed the default ACES tone
+    mapping and the whole scene brightened/oversaturated vs baseline. Any
+    composer chain here must end with a ToneMapping (ACES_FILMIC) pass.

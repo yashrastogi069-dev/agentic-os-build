@@ -125,6 +125,21 @@ export function ChatPanel({
     }
   }
 
+  // Arc Reactor bridge (§2.2): clicking the reactor (or Alt+J) dispatches a
+  // `jarvis:toggle-mic` window event. We keep the latest `toggleMic` in a ref
+  // so the listener registers exactly once yet never runs a stale closure
+  // (toggleMic is re-created each render as it closes over voiceState). This
+  // is the whole voice-flow touch Chunk C needs — Phase 6 replaces the bus.
+  const toggleMicRef = useRef(toggleMic)
+  toggleMicRef.current = toggleMic
+  useEffect(() => {
+    function handleToggleMic() {
+      void toggleMicRef.current()
+    }
+    window.addEventListener('jarvis:toggle-mic', handleToggleMic)
+    return () => window.removeEventListener('jarvis:toggle-mic', handleToggleMic)
+  }, [])
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [messages])

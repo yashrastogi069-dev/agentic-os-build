@@ -3,16 +3,111 @@
 Cross-session resume contract. Read this (and `tasks/PLAN.md`, `tasks/lessons.md`)
 before starting any new work on this project.
 
-## Current Phase (updated 2026-07-10 ~21:05 IST)
+## Current Phase (updated 2026-07-11, live)
 
-**Phase 0, 1, 2 COMPLETE. Phase 3 Chunks A + B COMPLETE and pushed**
-(commits through `cf476df`). Chunks C (Arc Reactor) and D (neural network +
-choreography + perf) NOT YET STARTED.
+**Phase 0, 1, 2 COMPLETE. Phase 3 Chunks A + B + B-redesign + C COMPLETE.**
+Chunk C (Arc Reactor) SHIPPED 2026-07-11 — built by Fable directly in the
+main session (Yash's override: Fable executes, not just plans; see memory
+`feedback_fable_builds_not_just_plans.md`). Chunk D (neural network +
+choreography + perf) NOT STARTED, but its Fable pre-flight brief is saved
+at `tasks/CHUNK_D_BRIEF.md` — build from it, do NOT regenerate it.
 
-**BLOCKED on Yash's Claude usage limit, resets ~1:12am IST 2026-07-10/11.**
-The session is chaining hourly ScheduleWakeup check-ins until reset, then
-resuming automatically. If you are a fresh session picking this up instead,
-do the NEXT STEPS below in order.
+### Chunk C — what shipped (2026-07-11)
+
+- `components/scene/arc-reactor.tsx` (NEW): full assembly — Mark-VI
+  triangular core (rounded-triangle emissive face, white-hot → accent
+  falloff texture, uniform-width TUBE bezel with integral corner nodes,
+  3 corner struts + 3 dark mid-edge clamps matched against a real prop
+  photo), coil ring of 10 wire-wound TORUS-ARC segments (winding texture
+  wraps the tube) over an emissive glow annulus (light through the slots),
+  mid ring annulus + 30 emissive ticks (per-instance flicker in thinking),
+  outer torus + 60 ticks (8 emissive index marks), 2 precessing gyro tori,
+  r1.4 invisible hitbox (hover → cursor + `jarvis:reactor-hover` + outer
+  ring rate ×3 lerped; click → `jarvis:toggle-mic`), full §3 per-state
+  choreography, reduced-motion freeze, zero-alloc useFrame.
+- `components/scene/jarvis-stage.tsx`: placeholder removed; ArcReactor
+  mounted; PMREM RoomEnvironment scene env-map; EffectComposer with Bloom
+  (mipmapBlur, threshold 1.0, smoothing 0.2, intensity 0.75, radius 0.6,
+  multisampling 4) + ACES ToneMapping pass (composer bypasses renderer
+  tone mapping — without it the whole scene brightened vs baseline);
+  composer unmounts on `quality:'low'` (React subscription); CameraRig
+  (§2.3: pointer parallax ±0.28/±0.16, Lissajous ±0.08 19s/23s, HUD
+  re-centering x-offset from store chatOpen/overlayOpen, all lerped
+  0.06/frame); ReactorLight eased to the §3 intensity table 2/3.5/6/4.5.
+- `lib/theme-engine.ts`: store gained `chatOpen`/`overlayOpen` +
+  `setHudLayout` + `setQuality` (HudShell writes; CameraRig reads).
+- `components/hud/hud-shell.tsx`: HUD-layout store bridge + Alt+J hotkey
+  dispatching `jarvis:toggle-mic`.
+- `components/chat-panel.tsx`: `jarvis:toggle-mic` listener (ref'd
+  toggleMic, registered once).
+- Deps added: `@react-three/postprocessing@3.0.4`, `postprocessing@6.39.2`.
+- Design iterations driven live by Yash: real-coil slot-glow, torus-arc
+  coil segments ("not boxes"), triangular core (EXPLICIT reversal of the
+  earlier "no triangle" decision — triangle is now IN), uniform tube
+  bezel corners, integral corner nodes, prop-matched struts + clamps,
+  gyro HDR 1.9→1.55, envMapIntensity 0.4→0.18.
+
+Gates: `pnpm typecheck` 0 errors; `pnpm build` green; live at 1536px:
+idle/hover screenshots (hover label "TALK TO JARVIS · ALT+J" verified),
+click → `jarvis:toggle-mic` event verified via instrumented listener
+(counter incremented; actual recording blocked only by browser mic
+permission in the test browser), full chat turn ran with the stage live,
+zero console errors. Deferred to the batched review pass: a mid-stream
+gold "thinking" screenshot (Gemini answered too fast to catch; the hue
+snap itself was live-verified in Chunk A), reduced-motion static-render
+re-check, tab-hidden resume check, perf trace (Chunk D adds the governor).
+
+### Higgsfield note
+Yash offered a fresh Higgsfield account/CLI for reference generation
+(first account: out of credits). NOT needed for C — a real Mark VI prop
+photo (fetched via Tavily) was the better ground truth. If D needs
+generated references, ask Yash first.
+
+### CHECKPOINT — read this before touching Chunk C or spawning any new agent
+
+Both Chunk C and D now run with **Fable as the executor itself** (not just
+planner/advisor for an Opus executor) — Yash's explicit override of the
+project's normal Opus-executes rule, for this track only. See memory
+`feedback_fable_builds_not_just_plans.md`.
+
+- **Fable pre-flight design briefs already written — do NOT regenerate
+  them.** `tasks/CHUNK_C_BRIEF.md` and `tasks/CHUNK_D_BRIEF.md` exist and
+  are authoritative. Re-running a Fable planning pass for either is
+  wasted work.
+- **A Workflow build for Chunk C is live right now:**
+  - Task ID: `wh6w9ss7h`
+  - Run ID: `wf_e07cd38f-5a8`
+  - Script path: `C:/Users/win 10/.claude/projects/C--Users-win-10-Desktop-praxis/25b6cefd-9bc3-4adf-80b7-7c8193686909/workflows/scripts/jarvis-chunk-c-arc-reactor-fable-wf_e07cd38f-5a8.js`
+    (forward slashes on purpose: Tailwind v4's content scanner parses
+    `\` followed by hex digits — e.g. `...praxis\25b6ce...` — as a CSS
+    unicode escape; out-of-range values hard-fail `pnpm build`. Never
+    write backslash paths with hex-leading segments in non-gitignored
+    files.)
+  - **If you are a fresh session (post usage-limit-reset) and this file
+    still shows Chunk C as "in progress": FIRST call
+    `TaskOutput({task_id: "wh6w9ss7h", block: false})` to check whether it
+    finished while you were gone.** If `status: completed`, read its
+    result instead of rebuilding. If it's gone/expired (new session, task
+    registry not carried over), do NOT write a fresh prompt from scratch —
+    resume the exact same script via
+    `Workflow({scriptPath: "<path above>", resumeFromRunId: "wf_e07cd38f-5a8"})`.
+    Workflow caches completed `agent()` calls by exact (prompt, opts), so a
+    finished build re-returns instantly with zero wasted tokens/time; only
+    an unfinished or never-started call actually re-runs.
+  - Only if both of the above are impossible (task registry AND run cache
+    both gone — e.g. a brand new machine/repo clone) should you write a new
+    build prompt, and even then, base it on `tasks/CHUNK_C_BRIEF.md`
+    directly rather than re-deriving requirements.
+- **Once Chunk C is confirmed done:** live-verify (screenshots, click →
+  mic toggle, bloom check), get Fable's advisory screenshot review, commit,
+  update this file's status line, THEN start Chunk D the same way — build
+  from `tasks/CHUNK_D_BRIEF.md`, Fable as executor, xhigh.
+- **Hold point unchanged:** after Chunk D ships, STOP for Yash's explicit
+  approval before Phase 4. Do not auto-advance.
+
+Original blocked-on-usage-limit note (2026-07-10/11, resolved) kept below
+for history; the NEXT STEPS list under it is now superseded by the
+CHECKPOINT above for anything C/D-related.
 
 ### NEXT STEPS (in order) once budget is available
 

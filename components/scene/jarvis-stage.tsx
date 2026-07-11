@@ -2,32 +2,29 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { EffectComposer, Bloom, ToneMapping } from '@react-three/postprocessing'
+import { ToneMappingMode } from 'postprocessing'
 import * as THREE from 'three'
-import { useThemeStore, writeLiveAccentSrgb } from '@/lib/theme-engine'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { useThemeStore, writeLiveAccentSrgb, type CoreState } from '@/lib/theme-engine'
 import { SpaceEnvironment } from '@/components/scene/environment'
+import { ArcReactor } from '@/components/scene/arc-reactor'
 import { Poster } from '@/components/scene/poster'
 
 /**
  * The single WebGL stage — Phase 3 §2 (tasks/PHASE3_DESIGN.md). One
- * `<Canvas>` for everything 3D: environment (starfield/grid/dust) plus,
- * later chunks, the Arc Reactor and neural network.
+ * `<Canvas>` for everything 3D: environment (starfield/grid/dust), the Arc
+ * Reactor assembly (Chunk C, tasks/CHUNK_C_BRIEF.md), and — Chunk D — the
+ * neural network lattice.
  *
- * CHUNK B SCOPE (§7 step 2): mount the stage, prove the z-layers and
- * composition work, and seed the scene with the environment plus ONE
- * placeholder emissive icosahedron standing in for the reactor position.
- * Deliberately NOT built here (owned by later chunks so each chunk ships a
- * self-contained, independently-verifiable diff):
- *  - The real Arc Reactor assembly (§2.2) — Chunk C.
- *  - The neural network lattice (§2.1) — Chunk D.
- *  - The bloom `EffectComposer` (§2.4) — Chunk C.
- *  - The perf governor (rolling-fps quality downgrade, §5) — Chunk D, once
- *    there's enough on screen for it to matter.
- *  - The full `CameraRig` (mouse parallax + idle Lissajous drift + the
- *    chat/overlay HUD x-offset re-centering lerp, §2.3) — Chunk C's
- *    verification explicitly covers "camera re-centering lerps", so the
- *    camera here stays at the spec's static base position or the reactor
- *    hitbox/hover model would need to be re-verified twice. This chunk's
- *    placeholder hover still works correctly at the base camera position.
+ * CHUNK C SCOPE (§7 step 3): the real reactor (components/scene/
+ * arc-reactor.tsx), selective bloom (§2.4: threshold 1.0 + HDR emissives =
+ * only emissives bloom), a RoomEnvironment reflection map so the machined
+ * metal actually reads as metal (CHUNK_C_BRIEF §1 trap 1), and the full
+ * CameraRig (§2.3: mouse parallax + idle Lissajous drift + HUD re-centering
+ * x-offset). Still deliberately NOT built here (Chunk D): the neural
+ * network, the perf governor's fps sampling (the quality store field and
+ * the composer's reaction to it are wired now).
  */
 
 function probeWebGL(): boolean {
@@ -43,114 +40,118 @@ function probeWebGL(): boolean {
   }
 }
 
-/** Soft radial-gradient sprite texture for the core halo (cheap fake volumetric). */
-function makeHaloTexture(): THREE.CanvasTexture {
-  const size = 128
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (ctx) {
-    const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-    gradient.addColorStop(0, 'rgba(255,255,255,0.9)')
-    gradient.addColorStop(0.4, 'rgba(255,255,255,0.28)')
-    gradient.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.fillStyle = gradient
-    ctx.fillRect(0, 0, size, size)
-  }
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.needsUpdate = true
-  return texture
-}
-
-/** Placeholder standing in for the Arc Reactor group until Chunk C: smooth
- * emissive core + additive halo + one machined dark-metal ring, tilted 12°
- * toward camera — the dark-metal-vs-light contrast of §8.3 in miniature. */
-function ReactorPlaceholder() {
-  const groupRef = useRef<THREE.Group>(null)
-  const coreMaterialRef = useRef<THREE.MeshBasicMaterial>(null)
-  const haloMaterialRef = useRef<THREE.SpriteMaterial>(null)
-  const scratchColor = useMemo(() => new THREE.Color(), [])
-  const rgbScratch = useMemo(() => ({ r: 0, g: 0, b: 0 }), [])
-  const haloTexture = useMemo(() => makeHaloTexture(), [])
+/**
+ * Scene-wide environment map — PMREMGenerator over three's procedural
+ * RoomEnvironment. One-time cost at mount, zero draw calls per frame; gives
+ * the reactor's `metalness: 0.85` surfaces something to reflect so they
+ * read as machined metal instead of black silhouette (CHUNK_C_BRIEF §1).
+ */
+function SceneEnvironmentMap() {
+  const gl = useThree((state) => state.gl)
+  const scene = useThree((state) => state.scene)
 
   useEffect(() => {
-    return () => haloTexture.dispose()
-  }, [haloTexture])
+    const pmrem = new THREE.PMREMGenerator(gl)
+    const envScene = new RoomEnvironment()
+    const envRT = pmrem.fromScene(envScene, 0.04)
+    scene.environment = envRT.texture
+    return () => {
+      scene.environment = null
+      envRT.dispose()
+      pmrem.dispose()
+    }
+  }, [gl, scene])
 
-  useFrame(({ clock }) => {
-    const { hue, energy, reducedMotion } = useThemeStore.getState()
-    writeLiveAccentSrgb(hue, rgbScratch)
-    scratchColor.setRGB(rgbScratch.r, rgbScratch.g, rgbScratch.b, THREE.SRGBColorSpace)
-    if (coreMaterialRef.current) {
-      coreMaterialRef.current.color.copy(scratchColor)
-    }
-    if (haloMaterialRef.current) {
-      haloMaterialRef.current.color.copy(scratchColor)
-    }
-    if (groupRef.current) {
-      const breathe = reducedMotion
-        ? 1
-        : 1 + 0.05 * Math.sin(clock.getElapsedTime() * 1.4) * (0.5 + energy * 0.5)
-      groupRef.current.scale.setScalar(breathe)
-    }
-  })
-
-  return (
-    <group
-      ref={groupRef}
-      position={[0, -0.15, 0]}
-      rotation={[-0.21, 0, 0]}
-      onPointerOver={(event) => {
-        event.stopPropagation()
-        document.body.style.cursor = 'pointer'
-        window.dispatchEvent(
-          new CustomEvent('jarvis:reactor-hover', { detail: { hovering: true } }),
-        )
-      }}
-      onPointerOut={(event) => {
-        event.stopPropagation()
-        document.body.style.cursor = 'auto'
-        window.dispatchEvent(
-          new CustomEvent('jarvis:reactor-hover', { detail: { hovering: false } }),
-        )
-      }}
-    >
-      <mesh>
-        <icosahedronGeometry args={[0.45, 4]} />
-        <meshBasicMaterial ref={coreMaterialRef} toneMapped={false} />
-      </mesh>
-      <sprite scale={[2.6, 2.6, 1]} position={[0, 0, -0.05]}>
-        <spriteMaterial
-          ref={haloMaterialRef}
-          map={haloTexture}
-          transparent
-          opacity={0.4}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </sprite>
-      <mesh>
-        <torusGeometry args={[0.85, 0.018, 12, 96]} />
-        <meshStandardMaterial color={0x1a2028} metalness={0.85} roughness={0.35} />
-      </mesh>
-    </group>
-  )
+  return null
 }
 
-/** ambientLight 0.15 + a point light at the reactor core, per spec §2. */
+/**
+ * Camera rig — §2.3. Fixed base at [0, 0.6, 7.2] looking at [0, 0.35, 0],
+ * three additive offsets all lerped 0.06/frame:
+ *  (a) mouse parallax ±0.28x / ±0.16y from the normalized pointer,
+ *  (b) idle Lissajous drift ±0.08 (periods 19s / 23s),
+ *  (c) the HUD re-centering x-offset (§1.2 reactor primacy rule): +0.55
+ *      when the chat dock is open, −0.35 more when an overlay is open —
+ *      read from the theme store via getState() (HudShell writes it).
+ * No OrbitControls — parallax gives life without fighting HUD pointer
+ * events. Reduced motion: parallax and drift are disabled; the HUD offset
+ * still applies (it's a composition correction, not an animation) but
+ * snaps instead of gliding.
+ */
+const CAMERA_BASE = { x: 0, y: 0.6, z: 7.2 } as const
+
+function CameraRig() {
+  const pointer = useRef({ x: 0, y: 0 })
+  const offset = useRef({ x: 0, y: 0 })
+
+  useEffect(() => {
+    function handlePointerMove(event: PointerEvent) {
+      pointer.current.x = (event.clientX / window.innerWidth) * 2 - 1
+      pointer.current.y = (event.clientY / window.innerHeight) * 2 - 1
+    }
+    window.addEventListener('pointermove', handlePointerMove)
+    return () => window.removeEventListener('pointermove', handlePointerMove)
+  }, [])
+
+  useFrame(({ camera, clock }) => {
+    const { chatOpen, overlayOpen, reducedMotion } = useThemeStore.getState()
+    const hudX = (chatOpen ? 0.55 : 0) + (overlayOpen ? -0.35 : 0)
+
+    if (reducedMotion) {
+      offset.current.x = hudX
+      offset.current.y = 0
+    } else {
+      const t = clock.getElapsedTime()
+      const targetX =
+        pointer.current.x * 0.28 + 0.08 * Math.sin((t * Math.PI * 2) / 19) + hudX
+      const targetY =
+        -pointer.current.y * 0.16 + 0.08 * Math.sin((t * Math.PI * 2) / 23)
+      offset.current.x += (targetX - offset.current.x) * 0.06
+      offset.current.y += (targetY - offset.current.y) * 0.06
+    }
+
+    camera.position.set(
+      CAMERA_BASE.x + offset.current.x,
+      CAMERA_BASE.y + offset.current.y,
+      CAMERA_BASE.z,
+    )
+    camera.lookAt(0, 0.35, 0)
+  })
+
+  return null
+}
+
+/**
+ * ambientLight 0.15 + the point light at the reactor core, per spec §2. The
+ * intensity follows §3's point-light row exactly (idle 2.0 / listening 3.5 /
+ * thinking 6.0 / speaking 4.5), eased 0.1/frame — this is the light that
+ * paints the live accent onto the machined rings ("the glowing of the core
+ * and colours", Yash 2026-07-11).
+ */
+const LIGHT_INTENSITY: Record<CoreState, number> = {
+  idle: 2.0,
+  listening: 3.5,
+  thinking: 6.0,
+  speaking: 4.5,
+}
+
 function ReactorLight() {
   const lightRef = useRef<THREE.PointLight>(null)
   const scratchColor = useMemo(() => new THREE.Color(), [])
   const rgbScratch = useMemo(() => ({ r: 0, g: 0, b: 0 }), [])
+  const intensity = useRef(LIGHT_INTENSITY.idle)
 
   useFrame(() => {
-    const { hue, energy } = useThemeStore.getState()
+    const { hue, coreState, reducedMotion } = useThemeStore.getState()
     writeLiveAccentSrgb(hue, rgbScratch)
     scratchColor.setRGB(rgbScratch.r, rgbScratch.g, rgbScratch.b, THREE.SRGBColorSpace)
+    const target = LIGHT_INTENSITY[coreState]
+    intensity.current = reducedMotion
+      ? target
+      : intensity.current + (target - intensity.current) * 0.1
     if (lightRef.current) {
       lightRef.current.color.copy(scratchColor)
-      lightRef.current.intensity = 2 + energy * 4
+      lightRef.current.intensity = intensity.current
     }
   })
 
@@ -178,8 +179,10 @@ function SceneContents() {
       <fog attach="fog" args={[0x0b0d14, 0.05]} />
       <ambientLight intensity={0.15} />
       <ReactorLight />
+      <SceneEnvironmentMap />
       <SpaceEnvironment />
-      <ReactorPlaceholder />
+      <ArcReactor />
+      <CameraRig />
       <ReducedMotionInvalidator />
     </>
   )
@@ -189,6 +192,11 @@ export function JarvisStage() {
   const [webglSupported, setWebglSupported] = useState<boolean | null>(null)
   const [tabHidden, setTabHidden] = useState(false)
   const reducedMotion = useThemeStore((state) => state.reducedMotion)
+  // React subscription (one re-render per change, never per-frame): the perf
+  // governor (Chunk D) flips quality to 'low' → the composer unmounts; the
+  // toneMapped:false HDR colors + halo sprites keep the reactor reading
+  // bright without bloom (§5, CHUNK_C_BRIEF §4).
+  const quality = useThemeStore((state) => state.quality)
 
   useEffect(() => {
     setWebglSupported(probeWebGL())
@@ -208,7 +216,7 @@ export function JarvisStage() {
 
   return (
     <Canvas
-      camera={{ position: [0, 0.6, 7.2], fov: 42 }}
+      camera={{ position: [CAMERA_BASE.x, CAMERA_BASE.y, CAMERA_BASE.z], fov: 42 }}
       dpr={[1, 1.5]}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       // 'demand' (not 'never'): r3f's invalidate() is a no-op when
@@ -227,6 +235,27 @@ export function JarvisStage() {
     >
       <Suspense fallback={null}>
         <SceneContents />
+        {/* Selective bloom for free (§2.4): threshold 1.0 + HDR-multiplied
+            emissives — only the core, halo, strips, ticks, and gyro edges
+            cross it; dark metal and scrims never bloom. multisampling 4 is
+            the taste/perf compromise: thin rotating metal edges shimmer
+            without AA (the composer bypasses the canvas's own MSAA), and
+            the governor unmounts the whole composer if fps drops anyway. */}
+        {quality === 'high' && (
+          <EffectComposer multisampling={4}>
+            <Bloom
+              mipmapBlur
+              luminanceThreshold={1.0}
+              luminanceSmoothing={0.2}
+              intensity={0.75}
+              radius={0.6}
+            />
+            {/* The composer bypasses the renderer's own tone mapping — without
+                this pass the whole scene brightens/oversaturates vs the
+                Chunk B baseline (live-verified 2026-07-11). ACES restores it. */}
+            <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+          </EffectComposer>
+        )}
       </Suspense>
     </Canvas>
   )

@@ -73,6 +73,18 @@ export function HudShell({ isDesktop }: { isDesktop: boolean }) {
     }
   }, [openPanel])
 
+  // Bridge HUD layout into the theme store so the scene's CameraRig can
+  // re-center the reactor into the free space the HUD leaves (§1.2). Written
+  // via the store action; the scene reads it per-frame with getState(), and
+  // no store subscriber selects these fields, so this triggers no re-renders.
+  useEffect(() => {
+    useThemeStore.getState().setHudLayout({ chatOpen: !chatCollapsed })
+  }, [chatCollapsed])
+
+  useEffect(() => {
+    useThemeStore.getState().setHudLayout({ overlayOpen: openPanel !== null })
+  }, [openPanel])
+
   // Global hotkeys: Ctrl+B collapses/expands the chat dock, Alt+1..5 summons
   // the corresponding panel (or closes it if already open). Esc is handled
   // by PanelOverlay itself while a panel is open.
@@ -84,6 +96,13 @@ export function HudShell({ isDesktop }: { isDesktop: boolean }) {
         return
       }
       if (event.altKey && !event.ctrlKey && !event.metaKey) {
+        // Alt+J — talk to Jarvis (§2.2/§6): same event the reactor click
+        // dispatches; chat-panel's listener toggles the mic.
+        if (event.key.toLowerCase() === 'j') {
+          event.preventDefault()
+          window.dispatchEvent(new CustomEvent('jarvis:toggle-mic'))
+          return
+        }
         const index = Number(event.key)
         if (index >= 1 && index <= RAIL_ITEMS.length) {
           event.preventDefault()

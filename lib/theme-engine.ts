@@ -35,10 +35,22 @@ export interface ThemeState {
   energy: number
   /** 0..1, Phase 6 feeds this from mic input during 'listening'. */
   micLevel: number
-  /** Perf governor field (set by jarvis-stage.tsx in a later chunk). */
+  /** Perf governor field (set by jarvis-stage.tsx's rolling-fps monitor, §5). */
   quality: 'high' | 'low'
   reducedMotion: boolean
+  /**
+   * HUD layout bridge (§1.2 "Reactor primacy rule"). HudShell writes these;
+   * the scene's CameraRig reads them via getState() in useFrame to lerp the
+   * reactor back to the visual center of the *free* space the HUD leaves.
+   * Chat dock (left) open pushes the framing right; an overlay (right) open
+   * pulls it back. Booleans, not the offset itself, so the easing curve stays
+   * owned by the camera rig (one source of truth for motion).
+   */
+  chatOpen: boolean
+  overlayOpen: boolean
   setCoreState: (state: CoreState) => void
+  setQuality: (quality: 'high' | 'low') => void
+  setHudLayout: (layout: { chatOpen?: boolean; overlayOpen?: boolean }) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +104,11 @@ export const useThemeStore = create<ThemeState>((set) => ({
   micLevel: 0,
   quality: 'high',
   reducedMotion: prefersReducedMotion(),
+  chatOpen: true,
+  overlayOpen: false,
   setCoreState: (state) => set({ coreState: state }),
+  setQuality: (quality) => set({ quality }),
+  setHudLayout: (layout) => set(layout),
 }))
 
 // ---------------------------------------------------------------------------

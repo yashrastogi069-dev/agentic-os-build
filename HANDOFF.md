@@ -96,32 +96,89 @@ live verification) and committed:
 | Chunk | Status | What it is |
 |---|---|---|
 | **A — Theme engine** | ✅ DONE, committed (`944aa1e`), pushed | `lib/theme-engine.ts` (zustand store), `components/theme-engine-provider.tsx` (rAF drift/snap loop), `--accent-live` writer. Live-verified: idle hue drifts continuously, snaps to state color on a real chat turn, freezes correctly under reduced-motion emulation. |
-| **B — Stage + HUD restructure** | ✅ DONE, committed (`97e15af`, `4958ce4`), pushed | `components/scene/jarvis-stage.tsx` (WebGL Canvas, space environment, placeholder reactor), `environment.tsx` (starfield/grid/dust), `poster.tsx` (no-WebGL/mobile CSS fallback), `components/hud/*` (hud-shell, edge-rail, panel-overlay, core-readout — the open glass layout), `app/page.tsx` fully rewritten, old `core-stage.tsx`/`neural-core.tsx` deleted. Live-verified via Playwright: full-bleed space environment, glass chat dock, edge rail with all 5 panel icons, `<1024px` responsive fallback, zero console errors, zero boxed borders. **However: see the open issue below — this passed every functional gate but Yash's live visual judgment is that it looks monochrome and dated, not futuristic.** |
+| **B — Stage + HUD restructure** | ✅ DONE, committed (`97e15af`, `4958ce4`), pushed | `components/scene/jarvis-stage.tsx` (WebGL Canvas, space environment, placeholder reactor), `environment.tsx` (starfield/grid/dust), `poster.tsx` (no-WebGL/mobile CSS fallback), `components/hud/*` (hud-shell, edge-rail, panel-overlay, core-readout — the open glass layout), `app/page.tsx` fully rewritten, old `core-stage.tsx`/`neural-core.tsx` deleted. Live-verified via Playwright: full-bleed space environment, glass chat dock, edge rail with all 5 panel icons, `<1024px` responsive fallback, zero console errors, zero boxed borders. Functional gates passed but failed on taste (see below) — **now resolved, see "Chunk B visual redesign" below.** |
+| **B redesign — futuristic color pass** | ✅ DONE, committed (`65e1557`), pushed | Fixed the "monochrome/boring/dated" verdict. See full writeup below. |
 | **C — Arc Reactor** | ⏳ NOT STARTED | Full ring-assembly geometry (coil/mid/outer rings + precessing gyro rings, per `PHASE3_DESIGN.md` §2.2 — the *original* Fable design; a literal "exact Iron Man triangle" version was explored and explicitly reverted by Yash), bloom post-processing, click/hover-to-talk mic wiring. **Hard rule: Opus at xhigh effort only, no compromise** (pin `model:'opus'` explicitly — session-model inheritance caused a near-miss once already). |
 | **D — Neural network + choreography + perf** | ⏳ NOT STARTED | The lattice (140+24 instanced nodes, edge pulses), the full per-agent-state animation table (idle/listening/thinking/speaking — colors, rates, light intensity), the performance governor (auto quality-drop below 40fps), final reduced-motion/tab-hidden correctness. Same Opus-xhigh no-compromise rule. |
 
-### Open issue blocking Chunk C/D start: Chunk B visual quality
+### Chunk B visual redesign — RESOLVED (2026-07-11)
 
 Yash's direct feedback after seeing Chunk B live: *"the hub has one colour
 only, it does not look futuristic/modern, the theme is very boring and
-old."* This is a real, unresolved problem — Chunk B is functionally
-correct but fails on taste. Working hypothesis (see `lessons.md` item 11a):
-the `.hud-glass` panels are likely too uniformly dark/desaturated at rest,
-so the Arc Reactor palette only reads through the 3D canvas and never
-reaches the HUD chrome itself.
+old."* Chunk B was functionally correct but failed on taste (see
+`lessons.md` item 11a).
 
-**This must be fixed FIRST, before Chunk C or D starts.** The required
-process (already written into `JARVIS_BUILD_STATE.md`'s NEXT STEPS):
-1. Start the dev server, take real screenshots.
-2. Run a genuine Fable design review of those screenshots — model `fable`,
-   high effort — explicitly invoking the `impeccable`, `ui-ux-pro-max`,
-   `emilkowal-animations`, and taste design skills, asking pointedly: does
-   this read as futuristic/modern/vibrant, or monochrome/boring/dated?
-3. Get concrete, specific fixes (exact color/opacity/gradient/accent
-   changes, not vague direction).
-4. Apply them, re-screenshot, confirm the improvement.
+**Process followed:**
+1. Started dev server, captured real baseline screenshots (idle stage +
+   feed panel open) at 1536px via Playwright.
+2. Ran a genuine Fable review (model `fable`, high effort) of those
+   screenshots plus the actual source files (globals.css, all HUD
+   components, scene/environment code), invoking impeccable/ui-ux-pro-max/
+   emilkowal-animations/taste design-skill judgment. Fable's measured
+   verdict: the screen was "black, gray, and one cyan" — `.hud-glass` at
+   chroma 0.01 was imperceptibly gray, the grid was at 7% alpha (invisible),
+   dust at 9% (invisible), the placeholder reactor was a flat unshaded
+   decagon (the single strongest "dated" signal), and there was zero
+   environmental depth or typography hierarchy.
+3. Fable returned 12 exact, ordered fixes (colors, gradients, opacities,
+   specific file/selector targets) — all applied:
+   - `.hud-glass` rebuilt as real gradient glass (cyan-to-indigo tint,
+     `saturate(140%)`, specular top inset, tinted hairline border, drop
+     shadow) + new `.hud-glass-accent-edge` light-catch utility.
+   - New `.hud-atmosphere` violet/cyan radial-gradient depth layer behind
+     the transparent Canvas; `--background` regraded to
+     `oklch(0.13 0.018 255)`; vignette/scrim recolored to match.
+   - Starfield given per-vertex stellar temperature variance (68% ice
+     white / 18% warm / 14% violet-white) instead of one flat color; grid
+     shader opacity 0.07→0.14 plus a brighter major-line-every-4th pass;
+     dust motes 64→96 count, opacity 0.09→0.16.
+   - Placeholder reactor (Chunk C will replace it) dressed with a smooth
+     detail-4 core, an additive halo sprite, and one dark-metal torus
+     ring tilted 12° — kills the flat-decagon look until the real
+     assembly ships.
+   - Gold micro-accents (wordmark `/`, readout `//` separator) at under 1%
+     screen coverage — one accent still owns the screen per taste
+     guardrails.
+   - Chat dock: input capsule with focus glow, filled live-accent SEND
+     button, tinted MIC/quick-action chips, borderless message bubbles.
+   - Status bar: glowing health dots, display-font wordmark, ghost
+     settings button. Edge rail: accent-tinted hover/active states. Panel
+     overlay: new slide-in-from-right entrance + two-tone headers. Feed
+     rows: borderless with hairline separators (removed the boxed-card
+     look that was recreating Phase 3's banned dividing-line pattern).
+4. **Bug found and fixed during this pass** (not in Fable's original list,
+   caught live by Yash): the two new `::before`/`::after`-based edge-glow
+   utilities (`hud-glass-accent-edge`, `hud-edge-fade`) declared
+   `position: relative` on their own class, which — same CSS specificity,
+   later in the stylesheet — silently overrode Tailwind's `fixed`/
+   `absolute` utility classes already on their host elements (the chat
+   dock, the overlay panel). Effect: summoned panels (Feed/Notes/Memory/
+   Skills/Settings) rendered bottom-left and clipped instead of the
+   intended right-side slide-in. Fix: removed the `position` declaration
+   from both utilities (their hosts already establish positioning
+   context); verified live that all 5 panels now open correctly on the
+   right.
+5. Gates: `pnpm typecheck` 0 errors, `pnpm build` succeeded, before/after
+   screenshots captured and compared.
 
-Only after that redesign is confirmed does Chunk C begin.
+**Files touched:** `app/globals.css`, `app/page.tsx`,
+`components/scene/jarvis-stage.tsx`, `components/scene/environment.tsx`,
+`components/hud/core-readout.tsx`, `components/hud/panel-overlay.tsx`,
+`components/hud/edge-rail.tsx`, `components/hud/hud-shell.tsx`,
+`components/status-bar.tsx`, `components/chat-panel.tsx`,
+`components/feed-panel.tsx`. Commit `65e1557`, pushed to
+`origin/jarvis-build`.
+
+**Outstanding:** a final Fable *confirmation* pass (reviewing the
+after-screenshots against the original verdict, plus flagging any residual
+nits for Chunk C's brief) was requested but failed mid-run —
+`Agent terminated early due to an API error: You've hit your session limit
+· resets 9:20am (Asia/Calcutta)`. Re-run this confirmation pass once the
+session limit resets, before or alongside starting Chunk C — it's a cheap
+sanity check, not a blocker, since the fixes already match Fable's own
+prior written brief and gates are green. Screenshots for that pass are
+saved at `C:\Users\win 10\Desktop\praxis\chunkB-redesign-idle.png` and
+`chunkB-redesign-panel-open.png`.
 
 ### Yash's standing instructions for the rest of Phase 3
 
