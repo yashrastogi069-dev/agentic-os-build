@@ -78,6 +78,7 @@ function Starfield({
   size,
   opacity,
   driftRate,
+  twinkle = false,
 }: {
   count: number
   rMin: number
@@ -86,8 +87,11 @@ function Starfield({
   opacity: number
   /** Radians/frame at 60fps idle rotation — kept small per the motion-restraint guardrail (§8.4). */
   driftRate: number
+  /** Near-shell only (§3 background row): opacity twinkle, amp ×2 while thinking. */
+  twinkle?: boolean
 }) {
   const pointsRef = useRef<THREE.Points>(null)
+  const twinkleTime = useRef(0)
 
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry()
@@ -117,9 +121,15 @@ function Starfield({
     }
   }, [geometry, material])
 
-  useFrame(() => {
-    if (useThemeStore.getState().reducedMotion || !pointsRef.current) return
+  useFrame((_, delta) => {
+    const { reducedMotion, coreState } = useThemeStore.getState()
+    if (reducedMotion || !pointsRef.current) return
     pointsRef.current.rotation.y += driftRate
+    if (twinkle) {
+      twinkleTime.current += Math.min(delta, 0.1)
+      const amp = 0.05 * (coreState === 'thinking' ? 2 : 1)
+      material.opacity = opacity + amp * Math.sin(twinkleTime.current * 1.7)
+    }
   })
 
   return <points ref={pointsRef} geometry={geometry} material={material} />
@@ -169,6 +179,11 @@ const GRID_FRAGMENT_SHADER = /* glsl */ `
 function GridFloor() {
   const materialRef = useRef<THREE.ShaderMaterial>(null)
   const rgbScratch = useMemo(() => ({ r: 0, g: 0, b: 0 }), [])
+  // Rate-scaled accumulator instead of clock.getElapsedTime() so the
+  // thinking-state ×2 scroll speeds the grid up without a time jump
+  // (CHUNK_D_BRIEF §3 background row), and a clamped delta keeps hidden-tab
+  // resume from lurching.
+  const scroll = useRef({ time: 0, pulse: 0 })
 
   const uniforms = useMemo(
     () => ({
@@ -180,12 +195,19 @@ function GridFloor() {
     [],
   )
 
-  useFrame(({ clock }) => {
-    const { hue, reducedMotion } = useThemeStore.getState()
+  useFrame((_, delta) => {
+    const { hue, coreState, reducedMotion } = useThemeStore.getState()
     writeLiveAccentSrgb(hue, rgbScratch)
     uniforms.uColor.value.setRGB(rgbScratch.r, rgbScratch.g, rgbScratch.b, THREE.SRGBColorSpace)
     if (!reducedMotion) {
-      uniforms.uTime.value = clock.getElapsedTime()
+      const dt = Math.min(delta, 0.1)
+      const s = scroll.current
+      s.time += dt * (coreState === 'thinking' ? 2 : 1)
+      uniforms.uTime.value = s.time
+      // Speaking: grid brightness pulses with the core's ~7Hz beat, smoothed.
+      const rawPulse = coreState === 'speaking' ? 0.5 + 0.5 * Math.sin(s.time * Math.PI * 14) : 0
+      s.pulse += (rawPulse - s.pulse) * 0.25
+      uniforms.uOpacity.value = 0.14 * (1 + 0.3 * s.pulse)
     }
   })
 
@@ -279,7 +301,8 @@ function DustMotes() {
   }, [geometry, material, texture])
 
   useFrame(({ clock }) => {
-    if (useThemeStore.getState().reducedMotion || !pointsRef.current) return
+    const { reducedMotion, coreState } = useThemeStore.getState()
+    if (reducedMotion || !pointsRef.current) return
     const t = clock.getElapsedTime()
     const array = pointsRef.current.geometry.attributes.position.array as Float32Array
     for (let i = 0; i < DUST_COUNT; i++) {
@@ -288,6 +311,9 @@ function DustMotes() {
       array[idx + 1] = basePositions[idx + 1] + Math.cos(t * 0.015 * speeds[i] + i) * 0.3
     }
     pointsRef.current.geometry.attributes.position.needsUpdate = true
+    // §3 background row: dust brightens while listening (0.16 → 0.21, lerped).
+    const targetOpacity = coreState === 'listening' ? 0.21 : 0.16
+    material.opacity += (targetOpacity - material.opacity) * 0.1
   })
 
   return <points ref={pointsRef} geometry={geometry} material={material} />
@@ -298,12 +324,27 @@ function DustMotes() {
 // ---------------------------------------------------------------------------
 
 export function SpaceEnvironment() {
+  // Perf governor reaction (§5): quality 'low' drops the near starfield and
+  // dust. React subscription — one re-render when the governor fires, never
+  // per-frame.
+  const quality = useThemeStore((state) => state.quality)
+
   return (
     <>
       <Starfield count={1100} rMin={40} rMax={70} size={0.06} opacity={0.55} driftRate={0.000012} />
-      <Starfield count={500} rMin={18} rMax={35} size={0.1} opacity={0.8} driftRate={0.00003} />
+      {quality === 'high' && (
+        <Starfield
+          count={500}
+          rMin={18}
+          rMax={35}
+          size={0.1}
+          opacity={0.8}
+          driftRate={0.00003}
+          twinkle
+        />
+      )}
       <GridFloor />
-      <DustMotes />
+      {quality === 'high' && <DustMotes />}
     </>
   )
 }

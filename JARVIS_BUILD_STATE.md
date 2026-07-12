@@ -57,6 +57,67 @@ gold "thinking" screenshot (Gemini answered too fast to catch; the hue
 snap itself was live-verified in Chunk A), reduced-motion static-render
 re-check, tab-hidden resume check, perf trace (Chunk D adds the governor).
 
+### Chunk D — SHIPPED 2026-07-12 (Fable, main session; then heavily
+### art-directed live by Yash into a full holographic neural field)
+
+Built by Fable directly in the main session (same override as Chunk C).
+Brief: `tasks/CHUNK_D_BRIEF.md`. The base lattice matched the brief; Yash
+then directed a substantial visual upgrade (see below). All gates green,
+committed, pushed. Hold point observed (did NOT start Phase 4).
+
+**What shipped:**
+1. `components/scene/neural-network.tsx` (NEW): the lattice, rebuilt as a
+   real-CG holographic energy field —
+   - NODES: a single `THREE.Points` cloud through a custom additive
+     ShaderMaterial — soft radial glow (no hard facets), per-point size +
+     color, and TRUE perspective z-depth scaling (`gl_PointSize` ∝
+     1/−viewZ, clamped 30px) = Yash's "2.5D pseudo-projection". Crisp
+     disc+faint-halo frag so nodes read as precise data marks, not smoke.
+   - DEPTH CUE: front-facing nodes (after live Y-rotation) brighter/bigger.
+   - RADAR SWEEP: per-node azimuth (atan2 z/x) vs a rotating sweep angle,
+     Gaussian lobe lights the wedge it crosses (SWEEP_SPEED 0.85).
+   - SHAPE MORPH ("forming different shapes"): 4 configs — organic sphere /
+     spiral disc / torus ring / rippled sheet — morphed in random order,
+     ~5.5s each + hold, smoothstep-eased, per-node slow flow on top.
+   - LIVE CONNECT/DISCONNECT: edges auto-join/disjoin at random (batch every
+     0.42s, ~62% lit), per-vertex additive brightness eased in/out.
+   - Full-screen: SHELL 320 + INTERIOR 64, RX/RY/RZ 3.5/2.3/2.2 at group
+     scale 3.9 → runs off all four viewport edges; group at [0,−0.9,−7.2]
+     centered on the reactor sight line.
+   - COLOR LIFE: idle hue-walk (14°/s OKLCH) independent of the reactor;
+     active states snap to the OS accent. Curved bezier arc edges; pulses
+     ride the arcs. Per-state choreography (idle/listening/thinking/
+     speaking), reduced-motion freeze, quality-'low' pool cap, zero-alloc
+     useFrame with per-frame position + line-buffer rebuild.
+   - NOTE: the hub-node → HUD-panel click "functionality" was built and
+     verified, then REMOVED at Yash's request ("remove functionality for
+     now"). The wiring hooks (`jarvis:open-panel`) are gone from
+     hud-shell/core-readout; re-add later if wanted.
+2. `components/scene/jarvis-stage.tsx`: NeuralNetwork mounted; camera
+   lookAt re-centered on the reactor [0,−0.15,0]; PerfGovernor (60-delta
+   ring buffer, fps<40 sustained 3s → setQuality('low') + dpr 1, one-way,
+   skips hidden/reduced-motion); ReducedMotionInvalidator invalidates on
+   quality change too.
+3. `components/scene/environment.tsx`: near-starfield twinkle; GridFloor
+   rate-scaled scroll + speaking opacity pulse; DustMotes 0.16→0.21 lerp
+   while listening; SpaceEnvironment renders near starfield + dust only at
+   quality 'high'.
+
+Gates: typecheck 0 errors; `pnpm build` green; live at 1536px — full-screen
+field, reactor centered, crisp nodes with depth, shapes morphing (sphere→
+disc→torus→sheet), colors cycling, edges joining/disjoining, zero console
+errors. Screenshots in `C:/Users/win 10/Desktop/praxis/` (chunkD-*.jpg).
+
+Deferred to the batched review pass (unchanged from Chunk C): gold
+"thinking" screenshot, reduced-motion static re-check, tab-hidden resume,
+perf trace / governor CPU-throttle test.
+
+Real Mark VI prop reference: `C:/Users/win 10/.claude/jobs/0d85a7ff/tmp/mk6-ref2.jpg`.
+
+### Phase 3 status: COMPLETE (Chunks A + B + B-redesign + C + D all shipped).
+HOLD POINT: awaiting Yash's explicit approval before Phase 4. A full
+forward plan for Phases 4-9 is being written to `tasks/MASTER_PLAN_V2.md`.
+
 ### Higgsfield note
 Yash offered a fresh Higgsfield account/CLI for reference generation
 (first account: out of credits). NOT needed for C — a real Mark VI prop

@@ -9,6 +9,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { useThemeStore, writeLiveAccentSrgb, type CoreState } from '@/lib/theme-engine'
 import { SpaceEnvironment } from '@/components/scene/environment'
 import { ArcReactor } from '@/components/scene/arc-reactor'
+import { NeuralNetwork } from '@/components/scene/neural-network'
 import { Poster } from '@/components/scene/poster'
 
 /**
@@ -66,7 +67,8 @@ function SceneEnvironmentMap() {
 }
 
 /**
- * Camera rig — §2.3. Fixed base at [0, 0.6, 7.2] looking at [0, 0.35, 0],
+ * Camera rig — §2.3. Fixed base at [0, 0.6, 7.2] looking at [0, -0.15, 0]
+ * (the reactor's center, so it holds the middle of the screen),
  * three additive offsets all lerped 0.06/frame:
  *  (a) mouse parallax ±0.28x / ±0.16y from the normalized pointer,
  *  (b) idle Lissajous drift ±0.08 (periods 19s / 23s),
@@ -115,7 +117,9 @@ function CameraRig() {
       CAMERA_BASE.y + offset.current.y,
       CAMERA_BASE.z,
     )
-    camera.lookAt(0, 0.35, 0)
+    // Aim at the reactor's actual center [0, -0.15, 0] so the assembly sits
+    // dead-center of the viewport (Yash 2026-07-12), not below it.
+    camera.lookAt(0, -0.15, 0)
   })
 
   return null
@@ -165,10 +169,59 @@ function ReducedMotionInvalidator() {
   const invalidate = useThree((state) => state.invalidate)
   const coreState = useThemeStore((state) => state.coreState)
   const reducedMotion = useThemeStore((state) => state.reducedMotion)
+  const quality = useThemeStore((state) => state.quality)
 
   useEffect(() => {
     if (reducedMotion) invalidate()
-  }, [reducedMotion, coreState, invalidate])
+  }, [reducedMotion, coreState, quality, invalidate])
+
+  return null
+}
+
+/**
+ * Performance governor — §5 / CHUNK_D_BRIEF §4. Rolling 60-frame fps from a
+ * delta ring buffer; below 40fps sustained for 3s → quality 'low' (composer
+ * unmounted, near starfield + dust hidden, pulse pool 12, dpr 1), then the
+ * sampler stops for the session. ONE-WAY on purpose: recovering would
+ * remount the composer (shader recompile jank) → fps dips → re-downgrade —
+ * an oscillator. Sampling skips hidden tabs and reduced motion (frameloop
+ * is 'demand' there; deltas would be meaningless).
+ */
+function PerfGovernor() {
+  const setDpr = useThree((state) => state.setDpr)
+  const monitor = useRef({
+    deltas: new Float32Array(60),
+    cursor: 0,
+    filled: 0,
+    badTime: 0,
+    done: false,
+  })
+
+  useFrame((_, delta) => {
+    const m = monitor.current
+    if (m.done) return
+    const { reducedMotion, quality } = useThemeStore.getState()
+    if (reducedMotion || quality === 'low' || document.hidden) return
+    m.deltas[m.cursor] = delta
+    m.cursor = (m.cursor + 1) % 60
+    if (m.filled < 60) {
+      m.filled++
+      return
+    }
+    let sum = 0
+    for (let i = 0; i < 60; i++) sum += m.deltas[i]
+    const fps = 60 / sum
+    if (fps < 40) {
+      m.badTime += delta
+      if (m.badTime >= 3) {
+        m.done = true
+        useThemeStore.getState().setQuality('low')
+        setDpr(1)
+      }
+    } else {
+      m.badTime = 0
+    }
+  })
 
   return null
 }
@@ -181,8 +234,10 @@ function SceneContents() {
       <ReactorLight />
       <SceneEnvironmentMap />
       <SpaceEnvironment />
+      <NeuralNetwork />
       <ArcReactor />
       <CameraRig />
+      <PerfGovernor />
       <ReducedMotionInvalidator />
     </>
   )
