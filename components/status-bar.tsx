@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
-import { Settings2 } from 'lucide-react'
+import { GearSix } from '@phosphor-icons/react'
 
 export interface HealthData {
   db: { ok: boolean; vec: boolean; memories: { total: number } }
@@ -121,7 +121,7 @@ export function StatusBar({ onOpenSettings }: { onOpenSettings: () => void }) {
           className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-[oklch(from_var(--accent-live)_l_c_h_/_10%)] hover:text-primary"
           aria-label="Open settings"
         >
-          <Settings2 className="size-4" aria-hidden="true" />
+          <GearSix className="size-4" weight="thin" aria-hidden="true" />
         </button>
       </div>
     </header>

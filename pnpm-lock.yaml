@@ -32,6 +32,9 @@ importers:
       '@openrouter/ai-sdk-provider':
         specifier: 3.0.0
         version: 3.0.0(ai@7.0.16(zod@4.4.3))(zod@4.4.3)
+      '@phosphor-icons/react':
+        specifier: ^2.1.10
+        version: 2.1.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@react-three/drei':
         specifier: ^10.7.7
         version: 10.7.7(@react-three/fiber@9.6.1(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(three@0.185.1))(@types/react@19.2.14)(@types/three@0.185.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(three@0.185.1)
@@ -56,9 +59,6 @@ importers:
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
-      lucide-react:
-        specifier: ^1.16.0
-        version: 1.17.0(react@19.2.4)
       mcp-handler:
         specifier: ^1.1.0
         version: 1.1.0(@modelcontextprotocol/sdk@1.26.0(zod@4.4.3))(next@16.2.6(@babel/core@7.29.7)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
@@ -1176,6 +1176,13 @@ packages:
     peerDependencies:
       ai: ^7.0.0
       zod: ^3.25.76 || ^4.1.8
+
+  '@phosphor-icons/react@2.1.10':
+    resolution: {integrity: sha512-vt8Tvq8GLjheAZZYa+YG/pW7HDbov8El/MANW8pOAz4eGxrwhnbfrQZq0Cp4q8zBEu8NIhHdnr+r8thnfRSNYA==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      react: '>= 16.8'
+      react-dom: '>= 16.8'
 
   '@react-three/drei@10.7.7':
     resolution: {integrity: sha512-ff+J5iloR0k4tC++QtD/j9u3w5fzfgFAWDtAGQah9pF2B1YgOq/5JxqY0/aVoQG5r3xSZz0cv5tk2YuBob4xEQ==}
@@ -2377,11 +2384,6 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
-
-  lucide-react@1.17.0:
-    resolution: {integrity: sha512-9FA9evdox/JQL5PT57fdA1x/yg8T7knJ98+zjTL3UfKza6pflQUUh3XtaQIHKvnsJw1lmsEyHVlt5jchYxOQ5w==}
-    peerDependencies:
-      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   maath@0.10.8:
     resolution: {integrity: sha512-tRvbDF0Pgqz+9XUa4jjfgAQ8/aPKmQdWXilFu2tMy4GWj4NOsx99HlULO4IeREfbO3a0sA145DZYyvXPkybm0g==}
@@ -4056,6 +4058,11 @@ snapshots:
       ai: 7.0.16(zod@4.4.3)
       zod: 4.4.3
 
+  '@phosphor-icons/react@2.1.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+    dependencies:
+      react: 19.2.4
+      react-dom: 19.2.4(react@19.2.4)
+
   '@react-three/drei@10.7.7(@react-three/fiber@9.6.1(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(three@0.185.1))(@types/react@19.2.14)(@types/three@0.185.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(three@0.185.1)':
     dependencies:
       '@babel/runtime': 7.29.7
@@ -5119,10 +5126,6 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
-
-  lucide-react@1.17.0(react@19.2.4):
-    dependencies:
-      react: 19.2.4
 
   maath@0.10.8(@types/three@0.185.0)(three@0.185.1):
     dependencies:

@@ -1,20 +1,20 @@
 'use client'
 
-import { Activity, Database, Settings2, StickyNote, Zap, type LucideIcon } from 'lucide-react'
+import { Database, GearSix, Lightning, Note, Pulse, type Icon as PhosphorIcon } from '@phosphor-icons/react'
 
 export type RightTab = 'feed' | 'notes' | 'memory' | 'skills' | 'settings'
 
 export const RAIL_ITEMS: Array<{
   tab: RightTab
   label: string
-  icon: LucideIcon
+  icon: PhosphorIcon
   hotkey: string
 }> = [
-  { tab: 'feed', label: 'Feed', icon: Activity, hotkey: 'Alt+1' },
-  { tab: 'notes', label: 'Notes', icon: StickyNote, hotkey: 'Alt+2' },
+  { tab: 'feed', label: 'Feed', icon: Pulse, hotkey: 'Alt+1' },
+  { tab: 'notes', label: 'Notes', icon: Note, hotkey: 'Alt+2' },
   { tab: 'memory', label: 'Memory', icon: Database, hotkey: 'Alt+3' },
-  { tab: 'skills', label: 'Skills', icon: Zap, hotkey: 'Alt+4' },
-  { tab: 'settings', label: 'Settings', icon: Settings2, hotkey: 'Alt+5' },
+  { tab: 'skills', label: 'Skills', icon: Lightning, hotkey: 'Alt+4' },
+  { tab: 'settings', label: 'Settings', icon: GearSix, hotkey: 'Alt+5' },
 ]
 
 /**
@@ -78,7 +78,11 @@ export function EdgeRail({
                 style={{ background: 'var(--accent-live)' }}
               />
             )}
-            <Icon className="size-[18px]" aria-hidden="true" />
+            <Icon
+              className="size-[18px]"
+              weight={isActive ? 'duotone' : 'regular'}
+              aria-hidden="true"
+            />
           </button>
         )
       })}

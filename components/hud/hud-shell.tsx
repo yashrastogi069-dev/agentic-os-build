@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MessageSquare, ChevronLeft } from 'lucide-react'
+import { ChatCircle, CaretLeft } from '@phosphor-icons/react'
 import { StatusBar } from '@/components/status-bar'
 import { ChatPanel } from '@/components/chat-panel'
 import { FeedPanel } from '@/components/feed-panel'
@@ -189,7 +189,7 @@ export function HudShell({ isDesktop }: { isDesktop: boolean }) {
             title="Ctrl+B"
             className="ml-auto rounded-sm p-1 text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <ChevronLeft
+            <CaretLeft
               className="size-4"
               style={{
                 transition: 'transform var(--duration-base) var(--ease-out-expo)',
@@ -206,7 +206,7 @@ export function HudShell({ isDesktop }: { isDesktop: boolean }) {
         </div>
         {chatCollapsed && (
           <div className="flex flex-1 items-center justify-center">
-            <MessageSquare className="size-4 text-muted-foreground" aria-hidden="true" />
+            <ChatCircle className="size-4 text-muted-foreground" aria-hidden="true" />
           </div>
         )}
       </div>
