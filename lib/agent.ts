@@ -27,6 +27,8 @@ import { telegramTools } from "@/lib/connectors/telegram"
 import { googleTools } from "@/lib/connectors/google"
 import { appleTools } from "@/lib/connectors/apple"
 import { getRecentEvents } from "@/lib/events"
+import { createTask, listTasks, completeTask, snoozeTask, updateTask } from "@/lib/tasks"
+import { setAssistantPreference } from "@/lib/assistant/prompt"
 
 /**
  * The OS brain now comes from the provider failsafe chain (lib/providers.ts):
@@ -152,10 +154,123 @@ const skillTools = {
   }),
 }
 
+const taskTools = {
+  createTask: tool({
+    description:
+      "Create a task/reminder. Use when the user mentions anything time-bound ('remind me', 'by Friday', 'tomorrow morning') or asks you to track something to do.",
+    inputSchema: z.object({
+      title: z.string().describe("Short task title."),
+      notes: z.string().optional().describe("Extra detail about the task."),
+      dueAt: z.string().optional().describe("ISO datetime the task is due, if any."),
+      remindAt: z.string().optional().describe("ISO datetime to remind the user, if any."),
+      recurrence: z
+        .enum(["daily", "weekdays", "weekly", "monthly"])
+        .optional()
+        .describe("Repeat rule, if this task recurs."),
+    }),
+    execute: async ({ title, notes, dueAt, remindAt, recurrence }) => {
+      const task = createTask({
+        title,
+        notes,
+        dueAt: dueAt ? new Date(dueAt).getTime() : undefined,
+        remindAt: remindAt ? new Date(remindAt).getTime() : undefined,
+        recurrence,
+      })
+      return { id: task.id, title: task.title, status: task.status }
+    },
+  }),
+  listTasks: tool({
+    description: "List tasks, optionally filtered by status ('open' or 'done').",
+    inputSchema: z.object({
+      status: z.enum(["open", "done"]).optional(),
+    }),
+    execute: async ({ status }) => {
+      const items = listTasks({ status })
+      return {
+        tasks: items.map((t) => ({
+          id: t.id,
+          title: t.title,
+          notes: t.notes,
+          status: t.status,
+          dueAt: t.dueAt ? new Date(t.dueAt).toISOString() : null,
+          remindAt: t.remindAt ? new Date(t.remindAt).toISOString() : null,
+          recurrence: t.recurrence,
+        })),
+      }
+    },
+  }),
+  completeTask: tool({
+    description:
+      "Mark a task done by id. If the task recurs, a fresh open task for the next occurrence is created automatically.",
+    inputSchema: z.object({
+      id: z.number().int().describe("The task id."),
+    }),
+    execute: async ({ id }) => {
+      const task = completeTask(id)
+      return { id: task.id, status: task.status, completedAt: task.completedAt ? new Date(task.completedAt).toISOString() : null }
+    },
+  }),
+  snoozeTask: tool({
+    description: "Push a task's reminder forward by N minutes from now.",
+    inputSchema: z.object({
+      id: z.number().int().describe("The task id."),
+      minutes: z.number().int().positive().describe("Minutes from now to re-remind."),
+    }),
+    execute: async ({ id, minutes }) => {
+      const task = snoozeTask(id, minutes)
+      return { id: task.id, remindAt: task.remindAt ? new Date(task.remindAt).toISOString() : null }
+    },
+  }),
+  updateTask: tool({
+    description: "Edit an existing task's title, notes, due date, reminder, or recurrence.",
+    inputSchema: z.object({
+      id: z.number().int().describe("The task id."),
+      title: z.string().optional(),
+      notes: z.string().optional(),
+      dueAt: z.string().optional().describe("New ISO due datetime."),
+      remindAt: z.string().optional().describe("New ISO reminder datetime."),
+      recurrence: z.enum(["daily", "weekdays", "weekly", "monthly"]).optional(),
+    }),
+    execute: async ({ id, title, notes, dueAt, remindAt, recurrence }) => {
+      const task = updateTask(id, {
+        title,
+        notes,
+        dueAt: dueAt ? new Date(dueAt).getTime() : undefined,
+        remindAt: remindAt ? new Date(remindAt).getTime() : undefined,
+        recurrence,
+      })
+      return {
+        id: task.id,
+        title: task.title,
+        dueAt: task.dueAt ? new Date(task.dueAt).toISOString() : null,
+        remindAt: task.remindAt ? new Date(task.remindAt).toISOString() : null,
+        recurrence: task.recurrence,
+      }
+    },
+  }),
+}
+
+const preferenceTools = {
+  setPreference: tool({
+    description:
+      "Persist how the user wants the assistant to behave — tone, verbosity, or how to address them. This PERSISTS across sessions: when the user says 'be more casual' or 'call me boss', use this so it sticks instead of complying for one turn only.",
+    inputSchema: z.object({
+      key: z.enum(["tone", "verbosity", "address"]),
+      value: z.string().describe("For tone: professional/casual/warm/direct. For verbosity: brief/balanced/detailed. For address: any short name."),
+    }),
+    execute: async ({ key, value }) => {
+      const prefs = setAssistantPreference(key, value)
+      return { preferences: prefs }
+    },
+  }),
+}
+
 const INSTRUCTIONS = `You are Agentic OS — a personal AI operating system running locally on the user's machine.
 
 Capabilities:
 - Long-term memory: saveMemory / recallMemory. Proactively recall context before answering personal questions; proactively save durable facts the user shares.
+- Tasks & reminders: createTask / listTasks / completeTask / snoozeTask / updateTask. When the user mentions anything time-bound ("remind me", "by Friday", "tomorrow morning"), create a task instead of just acknowledging.
+- Preferences: setPreference persists tone/verbosity/how to address the user across sessions — use it when the user says things like "be more casual" instead of just complying for one turn.
 - Obsidian vault: search, read, append, and create notes (when the connector is configured).
 - GitHub: notifications, PRs, issues, recent commits (when GITHUB_TOKEN is set).
 - Telegram: sendTelegram pushes messages to the user's phone; getTelegramMessages pulls new ones (when a bot token is configured).
@@ -175,6 +290,8 @@ const allTools = {
   ...memoryTools,
   ...feedTools,
   ...skillTools,
+  ...taskTools,
+  ...preferenceTools,
   ...researchTools,
   ...obsidianTools,
   ...githubTools,
@@ -183,11 +300,13 @@ const allTools = {
   ...appleTools,
 }
 
-/** Build the OS agent on a specific model (used by the failover loop). */
-export function buildAgent(model: LanguageModel) {
+/** Build the OS agent on a specific model (used by the failover loop). `extraInstructions`,
+ * when provided, is appended to the fixed INSTRUCTIONS for this call only (used to inject
+ * per-turn context: time, session summary, open tasks, relevant memories). */
+export function buildAgent(model: LanguageModel, extraInstructions?: string) {
   return new ToolLoopAgent({
     model,
-    instructions: INSTRUCTIONS,
+    instructions: extraInstructions ? `${INSTRUCTIONS}\n\n${extraInstructions}` : INSTRUCTIONS,
     tools: allTools,
     stopWhen: isStepCount(12),
   })
@@ -221,7 +340,17 @@ function chunkErrText(error: unknown): string {
   return String(error)
 }
 
-export async function streamOsAgentResponse(uiMessages: UIMessage[]): Promise<Response> {
+export interface StreamOsAgentOptions {
+  /** Appended to the fixed INSTRUCTIONS for this call — per-turn context (time, summary, tasks, memories). */
+  extraContext?: string
+  /** Invoked once the stream finishes with the assistant's final text, which provider answered, and its UI parts. */
+  onSessionPersist?: (result: { text: string; brain: string | null; uiParts: unknown[] }) => void
+}
+
+export async function streamOsAgentResponse(
+  uiMessages: UIMessage[],
+  opts: StreamOsAgentOptions = {},
+): Promise<Response> {
   // Loose cast: validateUIMessages wants Tool<unknown, unknown> per name, and
   // the concrete per-tool input types create needless invariance friction (the
   // ai package itself casts here inside createAgentUIStream, which is untyped JS).
@@ -232,15 +361,26 @@ export async function streamOsAgentResponse(uiMessages: UIMessage[]): Promise<Re
   const chain = getResolutionChain()
   const candidates: ResolvedProvider[] = chain.length > 0 ? chain : [resolveModel()]
 
+  let committedBrain: string | null = null
+
   const stream = createUIMessageStream({
     originalMessages: validated,
+    onFinish: ({ responseMessage }) => {
+      if (!opts.onSessionPersist) return
+      const text = (responseMessage.parts ?? [])
+        .filter((p): p is { type: "text"; text: string } => p.type === "text")
+        .map((p) => p.text)
+        .join("")
+      if (!text.trim()) return
+      opts.onSessionPersist({ text, brain: committedBrain, uiParts: responseMessage.parts })
+    },
     execute: async ({ writer }) => {
       let lastError = "No AI provider is currently available. Check API keys in Settings."
 
       for (const cand of candidates) {
         let result
         try {
-          result = await buildAgent(cand.model).stream({ prompt: modelMessages })
+          result = await buildAgent(cand.model, opts.extraContext).stream({ prompt: modelMessages })
         } catch (error) {
           lastError = chunkErrText(error)
           markProviderCooldown(cand.id, error)
@@ -282,6 +422,7 @@ export async function streamOsAgentResponse(uiMessages: UIMessage[]): Promise<Re
 
             // First real content chunk — commit to this provider.
             committed = true
+            committedBrain = cand.id
             writer.write({
               type: "data-brain",
               data: { provider: cand.id, label: cand.label },
