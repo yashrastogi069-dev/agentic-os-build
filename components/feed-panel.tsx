@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { SEED_EVENTS } from '@/lib/seed-data'
+import { GhostButton, HairlineRow, PanelSectionHeading, SeedBadge, StaggerList } from '@/components/hud/panel-kit'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -58,22 +59,11 @@ export function FeedPanel() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto p-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-          unified events
-        </span>
-        {seeded && (
-          <span className="rounded-sm border border-destructive/40 bg-destructive/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-destructive">
-            disconnected · seed data
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={syncNow}
-          disabled={syncing}
-          className="rounded-sm border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-40"
-        >
+        <PanelSectionHeading>unified events</PanelSectionHeading>
+        {seeded && <SeedBadge />}
+        <GhostButton onClick={syncNow} disabled={syncing}>
           {syncing ? 'syncing…' : 'sync'}
-        </button>
+        </GhostButton>
       </div>
       {isLoading && (
         <p className="animate-pulse font-mono text-xs text-muted-foreground">
@@ -87,19 +77,18 @@ export function FeedPanel() {
           {'> connect GitHub / Obsidian in settings, then refresh.'}
         </p>
       )}
-      <ul>
-        {events.map((event) => (
-          <li
-            key={event.id}
-            className="rounded-md border-b border-[oklch(1_0_0_/_6%)] px-3 py-2 transition-colors last:border-b-0 hover:bg-[oklch(1_0_0_/_4%)]"
-          >
+      <StaggerList
+        items={events}
+        keyFn={(event) => event.id}
+        renderItem={(event) => (
+          <HairlineRow>
             <div className="flex items-center justify-between gap-2">
               <span
                 className={`font-mono text-[10px] uppercase tracking-widest ${sourceColor[event.source] ?? 'text-muted-foreground'}`}
               >
                 {event.source} · {event.type}
               </span>
-              <span className="font-mono text-[10px] text-muted-foreground">
+              <span className="numeric font-mono text-[10px] text-muted-foreground">
                 {timeAgo(event.occurredAt)}
               </span>
             </div>
@@ -108,7 +97,7 @@ export function FeedPanel() {
                 href={event.url}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-1 block text-pretty text-sm text-foreground underline-offset-2 hover:underline"
+                className="mt-1 block rounded-sm text-pretty text-sm text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {event.title}
               </a>
@@ -117,9 +106,9 @@ export function FeedPanel() {
                 {event.title}
               </p>
             )}
-          </li>
-        ))}
-      </ul>
+          </HairlineRow>
+        )}
+      />
     </div>
   )
 }

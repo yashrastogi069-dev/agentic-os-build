@@ -4,17 +4,27 @@ import { Database, GearSix, Lightning, Note, Pulse, type Icon as PhosphorIcon } 
 
 export type RightTab = 'feed' | 'notes' | 'memory' | 'skills' | 'settings'
 
+/**
+ * Order here IS the hotkey order (hud-shell.tsx's Alt+1..N handler indexes
+ * into this array) — hotkey labels below are derived from index, not
+ * hardcoded, so appending a 6th item needs no hotkey bookkeeping.
+ *
+ * To add a panel, touch exactly these 4 spots:
+ *   1. `RightTab` union above (add the tab id)
+ *   2. `RAIL_ITEMS` below (one entry — hotkey is automatic)
+ *   3. `PANEL_LABEL` in hud-shell.tsx
+ *   4. the `renderPanel` switch case in hud-shell.tsx
+ */
 export const RAIL_ITEMS: Array<{
   tab: RightTab
   label: string
   icon: PhosphorIcon
-  hotkey: string
 }> = [
-  { tab: 'feed', label: 'Feed', icon: Pulse, hotkey: 'Alt+1' },
-  { tab: 'notes', label: 'Notes', icon: Note, hotkey: 'Alt+2' },
-  { tab: 'memory', label: 'Memory', icon: Database, hotkey: 'Alt+3' },
-  { tab: 'skills', label: 'Skills', icon: Lightning, hotkey: 'Alt+4' },
-  { tab: 'settings', label: 'Settings', icon: GearSix, hotkey: 'Alt+5' },
+  { tab: 'feed', label: 'Feed', icon: Pulse },
+  { tab: 'notes', label: 'Notes', icon: Note },
+  { tab: 'memory', label: 'Memory', icon: Database },
+  { tab: 'skills', label: 'Skills', icon: Lightning },
+  { tab: 'settings', label: 'Settings', icon: GearSix },
 ]
 
 /**
@@ -50,8 +60,9 @@ export function EdgeRail({
       aria-label="Panels"
       aria-orientation={vertical ? 'vertical' : 'horizontal'}
     >
-      {RAIL_ITEMS.map(({ tab, label, icon: Icon, hotkey }) => {
+      {RAIL_ITEMS.map(({ tab, label, icon: Icon }, index) => {
         const isActive = activeTab === tab
+        const hotkey = `Alt+${index + 1}`
         return (
           <button
             key={tab}

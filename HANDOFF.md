@@ -1,8 +1,8 @@
 # JARVIS — Handoff Document
 
-Status as of **2026-07-11, ~04:25 IST**. This is the authoritative "where are
-we right now" map. For the forward plan see `tasks/PLAN.md` and
-`tasks/PHASE3_DESIGN.md`; for the standing rules see `CLAUDE.md` and
+Status as of **2026-07-16**. This is the authoritative "where are we right
+now" map. For the forward plan (Phases 4-9, reconciled) see
+`tasks/MASTER_PLAN_V2.md`; for the standing rules see `CLAUDE.md` and
 `tasks/lessons.md`.
 
 **Project:** a local-first personal AI operating system — "Jarvis." SQLite +
@@ -98,8 +98,10 @@ live verification) and committed:
 | **A — Theme engine** | ✅ DONE, committed (`944aa1e`), pushed | `lib/theme-engine.ts` (zustand store), `components/theme-engine-provider.tsx` (rAF drift/snap loop), `--accent-live` writer. Live-verified: idle hue drifts continuously, snaps to state color on a real chat turn, freezes correctly under reduced-motion emulation. |
 | **B — Stage + HUD restructure** | ✅ DONE, committed (`97e15af`, `4958ce4`), pushed | `components/scene/jarvis-stage.tsx` (WebGL Canvas, space environment, placeholder reactor), `environment.tsx` (starfield/grid/dust), `poster.tsx` (no-WebGL/mobile CSS fallback), `components/hud/*` (hud-shell, edge-rail, panel-overlay, core-readout — the open glass layout), `app/page.tsx` fully rewritten, old `core-stage.tsx`/`neural-core.tsx` deleted. Live-verified via Playwright: full-bleed space environment, glass chat dock, edge rail with all 5 panel icons, `<1024px` responsive fallback, zero console errors, zero boxed borders. Functional gates passed but failed on taste (see below) — **now resolved, see "Chunk B visual redesign" below.** |
 | **B redesign — futuristic color pass** | ✅ DONE, committed (`65e1557`), pushed | Fixed the "monochrome/boring/dated" verdict. See full writeup below. |
-| **C — Arc Reactor** | ⏳ NOT STARTED | Full ring-assembly geometry (coil/mid/outer rings + precessing gyro rings, per `PHASE3_DESIGN.md` §2.2 — the *original* Fable design; a literal "exact Iron Man triangle" version was explored and explicitly reverted by Yash), bloom post-processing, click/hover-to-talk mic wiring. **Hard rule: Opus at xhigh effort only, no compromise** (pin `model:'opus'` explicitly — session-model inheritance caused a near-miss once already). |
-| **D — Neural network + choreography + perf** | ⏳ NOT STARTED | The lattice (140+24 instanced nodes, edge pulses), the full per-agent-state animation table (idle/listening/thinking/speaking — colors, rates, light intensity), the performance governor (auto quality-drop below 40fps), final reduced-motion/tab-hidden correctness. Same Opus-xhigh no-compromise rule. |
+| **C — Arc Reactor** | ✅ DONE, committed, pushed | Ring-assembly reactor with click/hover-to-talk mic wiring, camera lookAt centered on the reactor. |
+| **D — Neural network + choreography + perf** | ✅ SHIPPED, committed `12e7d0f`, pushed | Full rewrite of `components/scene/neural-network.tsx`: `THREE.Points` custom shader lattice (384 nodes: 320 shell + 64 interior, lumpy fibonacci sphere + 3 more morph configs — spiral disc, torus ring, rippled sheet), true perspective z-depth point sizing, crisp disc+halo fragment shader, radar sweep (azimuth vs rotating angle, Gaussian lobe), random-order auto shape morphing (5.5s morph + 0.55s hold), auto edge join/disjoin (timer-driven random batch retire/relight, per-vertex line colors), idle OKLCH hue walk with state-accent snap override, per-frame arc-line rebuild following the morph. Network group repositioned onto the camera→reactor sight line, full-screen coverage. Hub-click panel-shortcut functionality was built, verified, then **removed at Yash's explicit request** — plain `<points>` element remains, no interactivity. Extensive live art-direction loop with Yash (10+ rounds) before this landed; see git log on `jarvis-build` for the blow-by-blow. |
+
+**Phase 3 is fully complete.** The hold-point ("stop after B+C+D, wait for approval") was cleared — Yash reviewed live and said to continue to Phase 4.
 
 ### Chunk B visual redesign — RESOLVED (2026-07-11)
 
@@ -192,41 +194,70 @@ saved at `C:\Users\win 10\Desktop\praxis\chunkB-redesign-idle.png` and
 
 ---
 
-## 3. What's next after Phase 3 (approval-gated, not started)
+## 3. Phase 4 — Shell & panels redesign: DONE ON DISK, NOT YET COMMITTED
 
-Per `tasks/PLAN.md`'s phase plan — unchanged in substance, only Phase 3 has
-been elaborated/re-scoped:
+Full forward plan for Phases 4-9 (reconciled across 4 Fable planning
+subagents) lives in **`tasks/MASTER_PLAN_V2.md`** — read that for chunk
+breakdowns, cross-cutting decisions, and the Phase 6/7 flagship spec
+(voice pipeline + intelligence organs, adopting the already-built
+WhisperFlow clone at `Desktop/Whisper clone`). This section is just the
+Phase 4 status snapshot.
 
-- **Phase 4** — Shell & panels redesign: restyle every panel to the new
-  system, **migrate all icons from lucide-react to Phosphor**
-  (`@phosphor-icons/react`, thin/duotone — Yash's explicit call, overriding
-  Fable's "keep lucide" recommendation), registry-driven status dots
-  covering all connectors including the newer ones.
+- **4A — Phosphor icon migration**: ✅ DONE, committed (`e328cfe`), pushed.
+  `edge-rail.tsx`, `hud-shell.tsx`, `panel-overlay.tsx`, `status-bar.tsx`
+  fully off lucide-react, onto `@phosphor-icons/react` (thin/duotone).
+- **4B — panel-kit primitives + status bar/readout honesty**: ✅ DONE,
+  **staged on disk, not committed**. `components/hud/panel-kit.tsx`
+  created (new file). `status-bar.tsx` rewritten with data-driven
+  `DOT_DESCRIPTORS` (db/ollama/obsidian/github/telegram/google/apple/
+  voice/mcp) + `AggregateDot` collapse below `lg`. `core-readout.tsx` and
+  `edge-rail.tsx` also modified (brain-indicator fix, index-derived
+  hotkeys). `app/globals.css` gained the `--ease-hud` token +
+  `enter-rise` keyframe.
+- **4C — restyle all 5 panels onto panel-kit**: ✅ DONE, **staged on
+  disk, not committed**. `feed-panel.tsx`, `memory-panel.tsx`,
+  `notes-panel.tsx`, `settings-panel.tsx`, `skills-panel.tsx` all
+  modified.
+- **4D — batched verify + Fable taste review + ship**: ⏳ NOT DONE. This
+  is the remaining gap: run gates (`pnpm typecheck`, `pnpm build`),
+  live-verify all 5 panels + 9 dots + aggregate dot on :3100, get a Fable
+  taste pass on the restyled panels, update `JARVIS_BUILD_STATE.md` to
+  Phase 4 SHIPPED, commit (excluding the stray 1-line `tasks/PLAN.md`
+  diff — leave that file alone), push to `jarvis-build`.
+
+Executed fast via a Sonnet subagent per Yash's instruction ("this phase
+isn't that important, do it fast"); the agent was cut off by the weekly
+usage limit right before committing. Its work survived — `git status` in
+the repo shows the full staged diff. Next session: verify, gate, commit,
+push, then move straight to Phase 5.
+
+## 4. What's next after Phase 4 (per `tasks/MASTER_PLAN_V2.md`)
+
 - **Phase 5** — Connector framework refactor + Google/Telegram/local-system
   depth: a proper `{id, probe(), sync(), tools}` registry, OAuth CSRF fix
   (missing `state` param), a new local-system connector (filesystem watch,
   no external keys), deeper Obsidian (daily-note append, auto-index).
-- **Phase 6** — Voice, mode 1: the in-OS Jarvis you talk to. Streaming
-  `mic → VAD → whisper.cpp STT → brain → sentence-chunked TTS → speaker`
-  with barge-in. Runs via Workflow at Opus xhigh (same no-compromise rule
-  as Phase 3). Windows-specific setup script needed (prebuilt whisper.cpp +
-  Piper binaries — the repo's existing `setup-voice.sh` is bash-only and
-  will not work as-is on Windows).
-- **Phase 7** — Voice, mode 2: a separate WhisperFlow-style global-dictation
-  utility (Python, system-wide hotkey, works in any Windows app — this is
-  necessarily a companion tool outside the Next.js app, browsers can't do
-  system-wide text injection).
-- **Phase 8** — Skill mining: fan out subagents across all ~93 Claude Code
-  session transcripts on this machine (`~/.claude/projects/**/*.jsonl`,
-  privacy-guarded extraction — never copy secrets/tokens verbatim), 
-  synthesize into ranked skill proposals, get Yash's sign-off, create the
-  approved ones in the Skill Factory.
-- **Phase 9** — Harden & ship: full regression pass, rewrite this document
-  and the README to match final reality, draft PR `jarvis-build → main`.
+- **Phase 6 (flagship)** — Voice + intelligence organs: faster-whisper STT
+  sidecar on :8765 shared with the dictation tool, brain → sentence-chunked
+  TTS with barge-in, `chat_sessions`/`chat_messages`, context injection,
+  tasks + scheduler, prefs. Target latency p50 ≤1.8s. Opus xhigh, no
+  compromise (pin `model:'opus'` explicitly).
+- **Phase 7 (flagship)** — Adopt the already-built WhisperFlow clone
+  (`Desktop/Whisper clone`) into `tools/dictate`, wire `app/api/system/*`
+  with a system token, F9 ask-anywhere, proactive triggers + guardrails +
+  ntfy push.
+- **Phase 8** — Skill mining: fan out subagents across ~101 Claude Code
+  session transcripts on this machine (~124MB, privacy-guarded extraction —
+  never copy secrets/tokens verbatim, 4-layer redaction), synthesize into
+  ranked skill proposals, get Yash's sign-off, create the approved ones in
+  the Skill Factory.
+- **Phase 9** — Harden & ship: `SHIP_GATE.md`, git-history secrets scan,
+  prod smoke test, MCP e2e, full regression pass, rewrite this document and
+  the README to match final reality, draft PR `jarvis-build → main`.
 
 ---
 
-## 4. Known environment gotchas (don't rediscover these)
+## 5. Known environment gotchas (don't rediscover these)
 
 - **pnpm** is at `C:\Users\win 10\AppData\Roaming\npm\pnpm`, not
   necessarily on PATH in every shell — use the full path or prepend it.
@@ -248,7 +279,7 @@ been elaborated/re-scoped:
 
 ---
 
-## 5. File map (current, not the stale original)
+## 6. File map (current, not the stale original)
 
 Key files added/changed by this build beyond the original v0 export:
 
@@ -256,7 +287,8 @@ Key files added/changed by this build beyond the original v0 export:
 CLAUDE.md                          session bootstrap + standing rules
 HANDOFF.md                         this file
 JARVIS_BUILD_STATE.md              cross-session resume contract (phase/chunk status)
-tasks/PLAN.md                      Fable's master build plan
+tasks/MASTER_PLAN_V2.md            authoritative Phase 4-9 plan (reconciled, replaces PLAN.md forward sections)
+tasks/PLAN.md                      original master build plan (superseded going forward by MASTER_PLAN_V2.md)
 tasks/PHASE3_DESIGN.md             Fable's Phase 3 visual/technical spec
 tasks/lessons.md                   self-improvement log (every Yash correction)
 
@@ -270,12 +302,13 @@ components/theme-engine-provider.tsx
 components/scene/jarvis-stage.tsx  the single WebGL canvas (env + reactor + network)
 components/scene/environment.tsx   starfield / grid floor / dust
 components/scene/poster.tsx        no-WebGL / mobile CSS fallback
-components/scene/arc-reactor.tsx   NOT YET BUILT (Chunk C)
-components/scene/neural-network.tsx NOT YET BUILT (Chunk D)
+components/scene/arc-reactor.tsx   Chunk C reactor (DONE)
+components/scene/neural-network.tsx Chunk D lattice (DONE, shipped 12e7d0f)
 components/hud/hud-shell.tsx       layout orchestrator (chat dock, hotkeys)
 components/hud/edge-rail.tsx       5-icon panel-summon rail
 components/hud/panel-overlay.tsx   summonable glass panel
 components/hud/core-readout.tsx    bottom state/health caption
+components/hud/panel-kit.tsx       Phase 4B shared panel primitives (staged, uncommitted)
 
 components/core-stage.tsx          DELETED (superseded by scene/*)
 components/neural-core.tsx         DELETED (superseded by scene/*)

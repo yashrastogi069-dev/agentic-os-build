@@ -149,6 +149,10 @@ export function HudShell({ isDesktop }: { isDesktop: boolean }) {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30">
+      {/* z-50 top-right is reserved for Phase 6's `notification-toasts.tsx`
+          (reminder/event toasts, per MASTER_PLAN_V2.md §3 4B and §5.2) — it
+          must sit above the status bar (z-20) and the panel overlay (z-40).
+          Nothing mounts there yet; this comment is the reservation. */}
       <div className="hud-scrim-top pointer-events-none absolute inset-x-0 top-0 z-10 h-24" />
       <div className="pointer-events-auto absolute inset-x-0 top-0 z-20">
         <StatusBar onOpenSettings={() => togglePanel('settings')} />

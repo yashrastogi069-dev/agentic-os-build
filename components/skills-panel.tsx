@@ -2,6 +2,14 @@
 
 import { useState } from 'react'
 import useSWR from 'swr'
+import {
+  AccentButton,
+  GhostButton,
+  HairlineRow,
+  HudInput,
+  PanelSectionHeading,
+  StaggerList,
+} from '@/components/hud/panel-kit'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -74,26 +82,20 @@ export function SkillsPanel() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-          skill factory · loop engine
-        </span>
+        <PanelSectionHeading>skill factory · loop engine</PanelSectionHeading>
         <div className="flex gap-2">
           <button
             type="button"
             disabled={discovering}
             title="Analyze your usage history for repeated tasks"
             onClick={discover}
-            className="rounded-sm border border-accent/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-accent transition-colors hover:bg-accent/10 disabled:opacity-40"
+            className="rounded-sm border border-accent/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-accent transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
           >
             {discovering ? 'analyzing…' : 'discover'}
           </button>
-          <button
-            type="button"
-            onClick={() => setShowCreate((v) => !v)}
-            className="rounded-sm border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-          >
+          <GhostButton onClick={() => setShowCreate((v) => !v)}>
             {showCreate ? 'close' : '+ new skill'}
-          </button>
+          </GhostButton>
         </div>
       </div>
 
@@ -124,12 +126,15 @@ export function SkillsPanel() {
         </p>
       )}
 
-      <ul className="space-y-2">
-        {skills.map((skill) => (
-          <li key={skill.id} className="rounded-sm border border-border bg-card/40">
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 p-2 text-left"
+      <StaggerList
+        items={skills}
+        keyFn={(skill) => skill.id}
+        renderItem={(skill) => (
+          <>
+            <HairlineRow
+              as="button"
+              interactive
+              className="flex items-center gap-2"
               onClick={() => setExpandedId(expandedId === skill.id ? null : skill.id)}
               aria-expanded={expandedId === skill.id}
             >
@@ -140,9 +145,9 @@ export function SkillsPanel() {
               </span>
               <span className="flex-1 truncate font-mono text-xs text-foreground">
                 {skill.name}
-                <span className="text-muted-foreground"> · v{skill.version}</span>
+                <span className="numeric text-muted-foreground"> · v{skill.version}</span>
               </span>
-              <span className="font-mono text-[10px] text-muted-foreground">
+              <span className="numeric font-mono text-[10px] text-muted-foreground">
                 {skill.health.total} runs
                 {skill.health.total > 0 && (
                   <>
@@ -152,11 +157,11 @@ export function SkillsPanel() {
                   </>
                 )}
               </span>
-            </button>
+            </HairlineRow>
             {expandedId === skill.id && <SkillDetail skill={skill} onChanged={mutate} />}
-          </li>
-        ))}
-      </ul>
+          </>
+        )}
+      />
     </div>
   )
 }
@@ -191,40 +196,35 @@ function CreateSkillForm({ onCreated }: { onCreated: () => void }) {
     }
   }
 
-  const inputClass =
-    'w-full rounded-sm border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none'
-
   return (
-    <form onSubmit={submit} className="mb-3 flex flex-col gap-2 rounded-sm border border-border bg-card/40 p-2">
-      <input
-        className={inputClass}
+    <form onSubmit={submit} className="mb-3 flex flex-col gap-2 rounded-md bg-[oklch(1_0_0_/_3%)] p-2">
+      <HudInput
         placeholder="skill-name (kebab-case)"
         value={name}
         onChange={(e) => setName(e.target.value)}
         aria-label="Skill name"
       />
-      <input
-        className={inputClass}
+      <HudInput
         placeholder="one-line description"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         aria-label="Skill description"
       />
       <textarea
-        className={`${inputClass} min-h-20 resize-y`}
+        className="min-h-20 w-full resize-y rounded-sm border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         placeholder="step-by-step instructions for the agent…"
         value={instructions}
         onChange={(e) => setInstructions(e.target.value)}
         aria-label="Skill instructions"
       />
       {error && <p className="font-mono text-[10px] text-destructive">{error}</p>}
-      <button
+      <AccentButton
         type="submit"
         disabled={busy || !name.trim() || !description.trim() || !instructions.trim()}
-        className="self-end rounded-sm border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-primary transition-colors hover:bg-primary/20 disabled:opacity-40"
+        className="self-end"
       >
         {busy ? 'creating…' : 'create skill'}
-      </button>
+      </AccentButton>
     </form>
   )
 }
@@ -239,6 +239,11 @@ function SkillDetail({ skill, onChanged }: { skill: SkillItem; onChanged: () => 
   const [message, setMessage] = useState('')
   const [repo, setRepo] = useState('')
   const [proposal, setProposal] = useState<string | null>(null)
+  // Inline "what went wrong?" feedback capture for a bad rating — a native
+  // window.prompt() breaks HUD immersion, so this replaces it with an
+  // in-panel input that appears on the run whose rating is being captured.
+  const [feedbackDraftRunId, setFeedbackDraftRunId] = useState<number | null>(null)
+  const [feedbackText, setFeedbackText] = useState('')
 
   async function act(action: string, body: Record<string, unknown> = {}) {
     setBusyAction(action)
@@ -260,11 +265,17 @@ function SkillDetail({ skill, onChanged }: { skill: SkillItem; onChanged: () => 
     }
   }
 
-  const buttonClass =
-    'rounded-sm border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-40'
+  async function submitBadRating(runId: number) {
+    const feedback = feedbackText.trim() || undefined
+    await act('rate', { runId, rating: -1, feedback })
+    setFeedbackDraftRunId(null)
+    setFeedbackText('')
+    mutateDetail()
+    onChanged()
+  }
 
   return (
-    <div className="space-y-3 border-t border-border p-2">
+    <div className="space-y-3 border-t border-[oklch(1_0_0_/_6%)] p-2">
       <p className="font-mono text-[11px] leading-relaxed text-muted-foreground">{skill.description}</p>
       {skill.deployedTo && (
         <p className="font-mono text-[10px] text-success">deployed → {skill.deployedTo}</p>
@@ -272,15 +283,13 @@ function SkillDetail({ skill, onChanged }: { skill: SkillItem; onChanged: () => 
 
       {/* Run */}
       <div className="flex gap-2">
-        <input
-          className="min-w-0 flex-1 rounded-sm border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+        <HudInput
           placeholder="input for this skill run…"
           value={runInput}
           onChange={(e) => setRunInput(e.target.value)}
           aria-label={`Run input for ${skill.name}`}
         />
-        <button
-          type="button"
+        <GhostButton
           disabled={busyAction !== '' || !runInput.trim()}
           onClick={async () => {
             const result = await act('run', { input: runInput })
@@ -290,10 +299,9 @@ function SkillDetail({ skill, onChanged }: { skill: SkillItem; onChanged: () => 
               onChanged()
             }
           }}
-          className={buttonClass}
         >
           {busyAction === 'run' ? 'running…' : 'run'}
-        </button>
+        </GhostButton>
       </div>
 
       {/* Loop Engine actions */}
@@ -310,13 +318,12 @@ function SkillDetail({ skill, onChanged }: { skill: SkillItem; onChanged: () => 
                 onChanged()
               }
             }}
-            className="rounded-sm border border-success/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-success transition-colors hover:bg-success/10 disabled:opacity-40"
+            className="rounded-sm border border-success/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-success transition-colors hover:bg-success/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
           >
             {busyAction === 'approve' ? 'approving…' : 'approve candidate'}
           </button>
         )}
-        <button
-          type="button"
+        <GhostButton
           disabled={busyAction !== '' || skill.health.down === 0}
           title={skill.health.down === 0 ? 'Needs at least one thumbs-down run' : 'Propose improved instructions'}
           onClick={async () => {
@@ -326,19 +333,16 @@ function SkillDetail({ skill, onChanged }: { skill: SkillItem; onChanged: () => 
               else setMessage(String(result.reason ?? 'no proposal'))
             }
           }}
-          className={buttonClass}
         >
           {busyAction === 'refine' ? 'analyzing…' : 'refine'}
-        </button>
-        <input
-          className="min-w-0 flex-1 rounded-sm border border-border bg-background px-2 py-1 font-mono text-[10px] text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+        </GhostButton>
+        <HudInput
           placeholder="owner/repo"
           value={repo}
           onChange={(e) => setRepo(e.target.value)}
           aria-label="GitHub repo for deploy"
         />
-        <button
-          type="button"
+        <GhostButton
           disabled={busyAction !== '' || !repo.trim()}
           onClick={async () => {
             const result = await act('deploy', { repo })
@@ -347,10 +351,9 @@ function SkillDetail({ skill, onChanged }: { skill: SkillItem; onChanged: () => 
               onChanged()
             }
           }}
-          className={buttonClass}
         >
           {busyAction === 'deploy' ? 'deploying…' : 'deploy → github'}
-        </button>
+        </GhostButton>
         <button
           type="button"
           disabled={busyAction !== ''}
@@ -358,7 +361,7 @@ function SkillDetail({ skill, onChanged }: { skill: SkillItem; onChanged: () => 
             await fetch(`/api/skills/${skill.id}`, { method: 'DELETE' })
             onChanged()
           }}
-          className="rounded-sm border border-destructive/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-destructive transition-colors hover:bg-destructive/10"
+          className="rounded-sm border border-destructive/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
         >
           delete
         </button>
@@ -387,13 +390,11 @@ function SkillDetail({ skill, onChanged }: { skill: SkillItem; onChanged: () => 
                   onChanged()
                 }
               }}
-              className="rounded-sm border border-success/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-success transition-colors hover:bg-success/10"
+              className="rounded-sm border border-success/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-success transition-colors hover:bg-success/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               apply
             </button>
-            <button type="button" onClick={() => setProposal(null)} className={buttonClass}>
-              discard
-            </button>
+            <GhostButton onClick={() => setProposal(null)}>discard</GhostButton>
           </div>
         </div>
       )}
@@ -401,59 +402,90 @@ function SkillDetail({ skill, onChanged }: { skill: SkillItem; onChanged: () => 
       {/* Run history with rating */}
       {data && data.runs.length > 0 && (
         <div className="space-y-2">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            run history
-          </p>
-          {data.runs.slice(0, 5).map((run) => (
-            <div key={run.id} className="rounded-sm border border-border/60 p-2">
-              <p className="truncate font-mono text-[10px] text-muted-foreground">
-                in: {run.input}
-              </p>
-              <p className="mt-1 line-clamp-3 font-mono text-[11px] leading-relaxed text-foreground">
-                {run.output}
-              </p>
-              <div className="mt-1.5 flex items-center gap-2">
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  v{run.version} · {new Date(run.createdAt).toLocaleString()}
-                </span>
-                {run.rating === 0 ? (
-                  <>
-                    <button
-                      type="button"
-                      aria-label="Rate run good"
-                      onClick={async () => {
-                        await act('rate', { runId: run.id, rating: 1 })
-                        mutateDetail()
-                        onChanged()
-                      }}
-                      className="font-mono text-[10px] text-success hover:underline"
-                    >
-                      good
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Rate run bad"
-                      onClick={async () => {
-                        const feedback = window.prompt('What went wrong? (optional)') ?? undefined
-                        await act('rate', { runId: run.id, rating: -1, feedback })
-                        mutateDetail()
-                        onChanged()
-                      }}
-                      className="font-mono text-[10px] text-destructive hover:underline"
-                    >
-                      bad
-                    </button>
-                  </>
-                ) : (
-                  <span
-                    className={`font-mono text-[10px] ${run.rating === 1 ? 'text-success' : 'text-destructive'}`}
-                  >
-                    rated {run.rating === 1 ? 'good' : 'bad'}
+          <PanelSectionHeading>run history</PanelSectionHeading>
+          <StaggerList
+            items={data.runs.slice(0, 5)}
+            keyFn={(run) => run.id}
+            renderItem={(run) => (
+              <HairlineRow>
+                <p className="truncate font-mono text-[10px] text-muted-foreground">
+                  in: {run.input}
+                </p>
+                <p className="mt-1 line-clamp-3 font-mono text-[11px] leading-relaxed text-foreground">
+                  {run.output}
+                </p>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <span className="numeric font-mono text-[10px] text-muted-foreground">
+                    v{run.version} · {new Date(run.createdAt).toLocaleString()}
                   </span>
-                )}
-              </div>
-            </div>
-          ))}
+                  {run.rating === 0 ? (
+                    feedbackDraftRunId === run.id ? (
+                      <form
+                        className="flex flex-1 items-center gap-1.5"
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          submitBadRating(run.id)
+                        }}
+                      >
+                        <HudInput
+                          autoFocus
+                          value={feedbackText}
+                          onChange={(e) => setFeedbackText(e.target.value)}
+                          placeholder="what went wrong? (optional)"
+                          aria-label={`Feedback for run ${run.id}`}
+                          wrapperClassName="py-1"
+                        />
+                        <GhostButton type="submit" disabled={busyAction !== ''}>
+                          submit
+                        </GhostButton>
+                        <GhostButton
+                          type="button"
+                          onClick={() => {
+                            setFeedbackDraftRunId(null)
+                            setFeedbackText('')
+                          }}
+                        >
+                          cancel
+                        </GhostButton>
+                      </form>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          aria-label="Rate run good"
+                          onClick={async () => {
+                            await act('rate', { runId: run.id, rating: 1 })
+                            mutateDetail()
+                            onChanged()
+                          }}
+                          className="rounded-sm font-mono text-[10px] text-success hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          good
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Rate run bad"
+                          onClick={() => {
+                            setFeedbackDraftRunId(run.id)
+                            setFeedbackText('')
+                          }}
+                          className="rounded-sm font-mono text-[10px] text-destructive hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          bad
+                        </button>
+                      </>
+                    )
+                  ) : (
+                    <span
+                      className={`font-mono text-[10px] ${run.rating === 1 ? 'text-success' : 'text-destructive'}`}
+                    >
+                      rated {run.rating === 1 ? 'good' : 'bad'}
+                    </span>
+                  )}
+                </div>
+              </HairlineRow>
+            )}
+          />
         </div>
       )}
     </div>

@@ -45,7 +45,7 @@ export function CoreReadout() {
         {data ? (
           <>
             <span className="numeric text-[13px] text-primary">{data.db.memories.total}</span>{' '}
-            memories · <span className="text-primary">{data.chat.brain}</span> brain
+            memories · <span className="text-primary">{data.brain?.active ?? '—'}</span> brain
           </>
         ) : (
           'probing services…'

@@ -3,14 +3,54 @@
 Cross-session resume contract. Read this (and `tasks/PLAN.md`, `tasks/lessons.md`)
 before starting any new work on this project.
 
-## Current Phase (updated 2026-07-11, live)
+## Current Phase (updated 2026-07-16, live)
 
-**Phase 0, 1, 2 COMPLETE. Phase 3 Chunks A + B + B-redesign + C COMPLETE.**
-Chunk C (Arc Reactor) SHIPPED 2026-07-11 — built by Fable directly in the
-main session (Yash's override: Fable executes, not just plans; see memory
-`feedback_fable_builds_not_just_plans.md`). Chunk D (neural network +
-choreography + perf) NOT STARTED, but its Fable pre-flight brief is saved
-at `tasks/CHUNK_D_BRIEF.md` — build from it, do NOT regenerate it.
+**Phase 0, 1, 2, 3 (all chunks) COMPLETE. Phase 4 (Shell & panels
+redesign) SHIPPED 2026-07-16.** See "Phase 4 — SHIPPED" section below for
+the full writeup. Next up: Phase 5 (connector registry) per
+`tasks/MASTER_PLAN_V2.md` §4.
+
+### Phase 4 — SHIPPED (2026-07-16)
+
+Executed across 4A (Fable, main session) and 4B-4D (Sonnet subagent, per
+Yash's "do this fast, it's not that important" instruction). The 4B-4D
+subagent was cut off by the weekly usage limit right before committing;
+its staged work was verified and shipped in this session.
+
+- **4A — Phosphor icon migration**: `edge-rail.tsx`, `hud-shell.tsx`,
+  `panel-overlay.tsx`, `status-bar.tsx` moved off lucide-react onto
+  `@phosphor-icons/react` (thin/duotone weights).
+- **4B — panel-kit + status bar/readout honesty**: new
+  `components/hud/panel-kit.tsx` shared panel primitives; `status-bar.tsx`
+  rewritten with data-driven `DOT_DESCRIPTORS` (db/ollama/obsidian/github/
+  telegram/google/apple/voice/mcp) + `AggregateDot` collapse below `lg`;
+  `core-readout.tsx` + `edge-rail.tsx` (brain-indicator fix, index-derived
+  hotkeys); `app/globals.css` gained `--ease-hud` token + `enter-rise`
+  keyframe.
+- **4C — restyle all 5 panels onto panel-kit**: `feed-panel.tsx`,
+  `memory-panel.tsx`, `notes-panel.tsx`, `settings-panel.tsx`,
+  `skills-panel.tsx` all migrated.
+- **4D — verify + ship**: `pnpm typecheck` 0 errors; `pnpm build` green
+  (all 17 routes generated). Live-verified on dev (Playwright, :3000 —
+  dev server came up on the fallback port this run, not the usual :3100):
+  idle stage renders all 9 status dots + brain indicator; all 5 panels
+  (Feed/Notes/Memory/Skills/Settings) open correctly on the right with
+  consistent panel-kit chrome; Skills panel's "+ NEW SKILL" button present
+  (replacing the old `window.prompt`); zero console errors except two
+  honest 503s from Obsidian's Local REST API being offline (expected
+  graceful degradation, not a bug — Notes panel showed the correct
+  "OBSIDIAN DISCONNECTED" + setup instructions instead of crashing).
+  Screenshots: `C:/Users/win 10/Desktop/praxis/phase4d-*.jpg`.
+
+Committed `<commit-hash-placeholder>`, pushed to `origin/jarvis-build`.
+`tasks/PLAN.md`'s stray 1-line diff (1.5s→1s gate) was left uncommitted
+per standing instruction — do not stage that file.
+
+Deferred: a dedicated Fable taste pass on the restyled panels (batched
+into a future review pass, per Phase 3's precedent) was not run this
+session — the live screenshots above are the verification record.
+
+Previous Phase 3 completion note (2026-07-11) kept below for history:
 
 ### Chunk C — what shipped (2026-07-11)
 

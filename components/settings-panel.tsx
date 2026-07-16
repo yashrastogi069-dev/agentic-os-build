@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
+import { AccentButton, GhostButton, HudInput, PanelSectionHeading, StaggerList } from '@/components/hud/panel-kit'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -83,13 +84,16 @@ export function SettingsPanel() {
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-3">
       {/* Brain — provider failsafe chain (auto-routed, read-only status) */}
       <section>
-        <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <PanelSectionHeading as="h3" className="mb-2">
           agent brain
-        </h3>
+        </PanelSectionHeading>
         {health?.brain ? (
-          <ul className="space-y-1.5">
-            {health.brain.chain.map((p) => (
-              <li key={p.id} className="flex items-center gap-2">
+          <StaggerList
+            items={health.brain.chain}
+            keyFn={(p) => p.id}
+            className="space-y-1.5"
+            renderItem={(p) => (
+              <div className="flex items-center gap-2">
                 <span
                   className={`inline-block size-1.5 shrink-0 rounded-full ${BRAIN_DOT[p.status]}`}
                   aria-hidden="true"
@@ -98,9 +102,9 @@ export function SettingsPanel() {
                 <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                   {BRAIN_LABEL[p.status]}
                 </span>
-              </li>
-            ))}
-          </ul>
+              </div>
+            )}
+          />
         ) : (
           <p className="font-mono text-[10px] text-muted-foreground">reading provider chain…</p>
         )}
@@ -112,9 +116,9 @@ export function SettingsPanel() {
 
       {/* Obsidian */}
       <section>
-        <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <PanelSectionHeading as="h3" className="mb-2">
           obsidian vault
-        </h3>
+        </PanelSectionHeading>
         {data.obsidian.configured ? (
           <div className="space-y-2">
             <p className="font-mono text-xs text-primary">
@@ -135,7 +139,7 @@ export function SettingsPanel() {
                 )
                 setIndexing(false)
               }}
-              className="w-full rounded-sm border border-accent/40 bg-accent/10 px-3 py-2 font-mono text-xs uppercase tracking-widest text-accent transition-colors hover:bg-accent/20 disabled:opacity-40"
+              className="w-full rounded-sm border border-accent/40 bg-accent/10 px-3 py-2 font-mono text-xs uppercase tracking-widest text-accent transition-colors hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
             >
               {indexing ? 'indexing…' : 'index vault into memory'}
             </button>
@@ -150,29 +154,23 @@ export function SettingsPanel() {
               setObsidianKey('')
             }}
           >
-            <input
+            <HudInput
               type="password"
               value={obsidianKey}
               onChange={(e) => setObsidianKey(e.target.value)}
               placeholder="Local REST API plugin key"
               aria-label="Obsidian Local REST API key"
-              className="flex-1 rounded-sm border border-border bg-transparent px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
             />
-            <button
-              type="submit"
-              className="rounded-sm border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-xs uppercase text-primary hover:bg-primary/20"
-            >
-              save
-            </button>
+            <AccentButton type="submit">save</AccentButton>
           </form>
         )}
       </section>
 
       {/* Telegram */}
       <section>
-        <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <PanelSectionHeading as="h3" className="mb-2">
           telegram bot
-        </h3>
+        </PanelSectionHeading>
         {data.telegram.configured ? (
           <p className="font-mono text-xs text-primary">bot token configured</p>
         ) : (
@@ -186,35 +184,29 @@ export function SettingsPanel() {
               setStatusLine('telegram bot saved — message your bot, then sync feeds')
             }}
           >
-            <input
+            <HudInput
               type="password"
               value={telegramToken}
               onChange={(e) => setTelegramToken(e.target.value)}
               placeholder="bot token from @BotFather"
               aria-label="Telegram bot token"
-              className="flex-1 rounded-sm border border-border bg-transparent px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
             />
-            <button
-              type="submit"
-              className="rounded-sm border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-xs uppercase text-primary hover:bg-primary/20"
-            >
-              save
-            </button>
+            <AccentButton type="submit">save</AccentButton>
           </form>
         )}
       </section>
 
       {/* Google */}
       <section>
-        <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <PanelSectionHeading as="h3" className="mb-2">
           google calendar + gmail
-        </h3>
+        </PanelSectionHeading>
         {data.google.connected ? (
           <p className="font-mono text-xs text-primary">connected (read-only)</p>
         ) : data.google.credentials ? (
           <a
             href="/api/google/auth"
-            className="block w-full rounded-sm border border-primary/40 bg-primary/10 px-3 py-2 text-center font-mono text-xs uppercase tracking-widest text-primary transition-colors hover:bg-primary/20"
+            className="block w-full rounded-sm border border-primary/40 bg-primary/10 px-3 py-2 text-center font-mono text-xs uppercase tracking-widest text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             connect google account
           </a>
@@ -234,29 +226,22 @@ export function SettingsPanel() {
               setStatusLine('google credentials saved — now click connect')
             }}
           >
-            <input
+            <HudInput
               type="text"
               value={googleClientId}
               onChange={(e) => setGoogleClientId(e.target.value)}
               placeholder="OAuth client ID"
               aria-label="Google OAuth client ID"
-              className="w-full rounded-sm border border-border bg-transparent px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
             />
             <div className="flex gap-2">
-              <input
+              <HudInput
                 type="password"
                 value={googleClientSecret}
                 onChange={(e) => setGoogleClientSecret(e.target.value)}
                 placeholder="OAuth client secret"
                 aria-label="Google OAuth client secret"
-                className="flex-1 rounded-sm border border-border bg-transparent px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
               />
-              <button
-                type="submit"
-                className="rounded-sm border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-xs uppercase text-primary hover:bg-primary/20"
-              >
-                save
-              </button>
+              <AccentButton type="submit">save</AccentButton>
             </div>
             <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
               create a Web OAuth client in Google Cloud Console with redirect URI
@@ -268,9 +253,9 @@ export function SettingsPanel() {
 
       {/* Apple Calendar */}
       <section>
-        <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <PanelSectionHeading as="h3" className="mb-2">
           apple calendar (icloud)
-        </h3>
+        </PanelSectionHeading>
         {data.apple.configured ? (
           <p className="font-mono text-xs text-primary">
             configured as {data.apple.appleId}
@@ -291,29 +276,22 @@ export function SettingsPanel() {
               setStatusLine('apple calendar saved — sync feeds to pull events')
             }}
           >
-            <input
+            <HudInput
               type="email"
               value={appleId}
               onChange={(e) => setAppleId(e.target.value)}
               placeholder="Apple ID email"
               aria-label="Apple ID email"
-              className="w-full rounded-sm border border-border bg-transparent px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
             />
             <div className="flex gap-2">
-              <input
+              <HudInput
                 type="password"
                 value={applePassword}
                 onChange={(e) => setApplePassword(e.target.value)}
                 placeholder="app-specific password"
                 aria-label="Apple app-specific password"
-                className="flex-1 rounded-sm border border-border bg-transparent px-2 py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
               />
-              <button
-                type="submit"
-                className="rounded-sm border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-xs uppercase text-primary hover:bg-primary/20"
-              >
-                save
-              </button>
+              <AccentButton type="submit">save</AccentButton>
             </div>
             <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
               generate an app-specific password at appleid.apple.com → security
@@ -324,12 +302,12 @@ export function SettingsPanel() {
 
       {/* Connector sync */}
       <section>
-        <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <PanelSectionHeading as="h3" className="mb-2">
           connectors
-        </h3>
-        <button
-          type="button"
+        </PanelSectionHeading>
+        <AccentButton
           disabled={syncing}
+          className="w-full py-2"
           onClick={async () => {
             setSyncing(true)
             setStatusLine('syncing all connectors…')
@@ -355,10 +333,9 @@ export function SettingsPanel() {
             setSyncing(false)
             mutate('/api/feed')
           }}
-          className="w-full rounded-sm border border-primary/40 bg-primary/10 px-3 py-2 font-mono text-xs uppercase tracking-widest text-primary transition-colors hover:bg-primary/20 disabled:opacity-40"
         >
           {syncing ? 'syncing…' : 'sync feeds now'}
-        </button>
+        </AccentButton>
         <p className="mt-1 font-mono text-[10px] text-muted-foreground">
           github uses GITHUB_TOKEN from .env.local
         </p>
@@ -366,30 +343,22 @@ export function SettingsPanel() {
 
       {/* MCP */}
       <section>
-        <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <PanelSectionHeading as="h3" className="mb-2">
           claude code / mcp
-        </h3>
+        </PanelSectionHeading>
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <code className="flex-1 truncate rounded-sm border border-border bg-card px-2 py-1.5 font-mono text-[10px] text-muted-foreground">
+            <code className="flex-1 truncate rounded-sm border border-[oklch(1_0_0_/_8%)] bg-[oklch(1_0_0_/_3%)] px-2 py-1.5 font-mono text-[10px] text-muted-foreground">
               {showMcpKey ? data.mcp.key : '•'.repeat(32)}
             </code>
-            <button
-              type="button"
-              onClick={() => setShowMcpKey((v) => !v)}
-              className="rounded-sm border border-border px-2 py-1.5 font-mono text-[10px] uppercase text-muted-foreground hover:text-foreground"
-            >
+            <GhostButton size="sm" onClick={() => setShowMcpKey((v) => !v)}>
               {showMcpKey ? 'hide' : 'show'}
-            </button>
+            </GhostButton>
           </div>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => copy(mcpCommand, 'command')}
-              className="flex-1 rounded-sm border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-primary hover:bg-primary/20"
-            >
+            <AccentButton size="xs" className="flex-1 py-1.5" onClick={() => copy(mcpCommand, 'command')}>
               {copied === 'command' ? 'copied' : 'copy claude setup command'}
-            </button>
+            </AccentButton>
             <button
               type="button"
               onClick={async () => {
@@ -397,7 +366,7 @@ export function SettingsPanel() {
                   await postSettings({ action: 'regenerateMcpKey' })
                 }
               }}
-              className="rounded-sm border border-destructive/40 px-3 py-1.5 font-mono text-[10px] uppercase text-destructive hover:bg-destructive/10"
+              className="rounded-sm border border-destructive/40 px-3 py-1.5 font-mono text-[10px] uppercase text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               rotate
             </button>
@@ -406,7 +375,7 @@ export function SettingsPanel() {
       </section>
 
       {statusLine && (
-        <p className="border-t border-border pt-2 font-mono text-[10px] leading-relaxed text-accent">
+        <p className="border-t border-[oklch(1_0_0_/_6%)] pt-2 font-mono text-[10px] leading-relaxed text-accent">
           {'> '}
           {statusLine}
         </p>
