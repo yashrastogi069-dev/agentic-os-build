@@ -22,3 +22,7 @@ tsconfig.tsbuildinfo
 data/
 bin/
 models/
+
+# Phase 6 voice sidecar local env
+tools/stt-server/.venv/
+tools/**/__pycache__/
