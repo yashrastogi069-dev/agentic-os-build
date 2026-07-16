@@ -42,9 +42,9 @@ its staged work was verified and shipped in this session.
   "OBSIDIAN DISCONNECTED" + setup instructions instead of crashing).
   Screenshots: `C:/Users/win 10/Desktop/praxis/phase4d-*.jpg`.
 
-Committed `<commit-hash-placeholder>`, pushed to `origin/jarvis-build`.
-`tasks/PLAN.md`'s stray 1-line diff (1.5s→1s gate) was left uncommitted
-per standing instruction — do not stage that file.
+Committed `f3dc740`, pushed to `origin/jarvis-build`. `tasks/PLAN.md`'s
+stray 1-line diff (1.5s→1s gate) was left uncommitted per standing
+instruction — do not stage that file.
 
 Deferred: a dedicated Fable taste pass on the restyled panels (batched
 into a future review pass, per Phase 3's precedent) was not run this
