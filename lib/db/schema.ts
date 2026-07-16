@@ -101,9 +101,104 @@ export const agentRuns = sqliteTable("agent_runs", {
     .$defaultFn(() => new Date()),
 })
 
+/**
+ * Multi-turn conversation persistence (Phase 6). One row per conversation;
+ * `summary` is the rolling compression of everything up to and including
+ * message id `summaryThroughMessageId` — turns after that id are still in
+ * chat_messages verbatim and get sent to the model raw.
+ */
+export const chatSessions = sqliteTable("chat_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull().default("New conversation"),
+  summary: text("summary"),
+  summaryThroughMessageId: integer("summary_through_message_id"),
+  /** "text" | "voice" — which surface last drove this session. */
+  lastMode: text("last_mode").notNull().default("text"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
+/**
+ * Persisted turns. `content` is the flattened plain text (context building,
+ * summarization, search); `uiParts` is the full UIMessage parts array so the
+ * client restores tool calls/results faithfully on resume.
+ */
+export const chatMessages = sqliteTable("chat_messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sessionId: integer("session_id").notNull(),
+  role: text("role").notNull(), // "user" | "assistant" | "system"
+  content: text("content").notNull(),
+  uiParts: text("ui_parts", { mode: "json" }).$type<unknown[]>(),
+  /** Provider that answered (assistant rows), e.g. "gemini". */
+  brain: text("brain"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
+/**
+ * Tasks/reminders (Phase 6). Snooze = push remindAt forward. The scheduler
+ * fires rows where status='open' AND remindAt <= now AND (lastFiredAt IS NULL
+ * OR lastFiredAt < remindAt); recurrence recomputes remindAt after firing.
+ */
+export const tasks = sqliteTable("tasks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  notes: text("notes"),
+  status: text("status").notNull().default("open"), // open | done
+  dueAt: integer("due_at", { mode: "timestamp_ms" }),
+  remindAt: integer("remind_at", { mode: "timestamp_ms" }),
+  /** null | "daily" | "weekdays" | "weekly" | "monthly" */
+  recurrence: text("recurrence"),
+  lastFiredAt: integer("last_fired_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+})
+
+/**
+ * THE one notification queue (MASTER_PLAN_V2 §1.1) — Phase 6 in-tab toasts
+ * and Phase 7's companion (Windows toasts + ntfy) consume the SAME rows.
+ * `dedupeKey` is UNIQUE so an event can never be enqueued twice; convention:
+ * "reminder:task:<taskId>:<remindAtMs>", "connector:<id>:down:<dayBucket>".
+ * Channel delivery is recorded per-channel in `channels` (name -> epoch ms);
+ * `ackedAt` ends the row's life for every consumer.
+ */
+export const notifications = sqliteTable("notifications", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  kind: text("kind").notNull(), // reminder | calendar | job | digest | connector | system
+  title: text("title").notNull(),
+  body: text("body"),
+  dedupeKey: text("dedupe_key").notNull().unique(),
+  taskId: integer("task_id"),
+  payload: text("payload", { mode: "json" }).$type<Record<string, unknown>>(),
+  deliverAt: integer("deliver_at", { mode: "timestamp_ms" }).notNull(),
+  channels: text("channels", { mode: "json" })
+    .$type<Record<string, number>>()
+    .notNull()
+    .default({}),
+  ackedAt: integer("acked_at", { mode: "timestamp_ms" }),
+  snoozedUntil: integer("snoozed_until", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
 export type Memory = typeof memories.$inferSelect
 export type Event = typeof events.$inferSelect
 export type ConnectorSetting = typeof connectorSettings.$inferSelect
 export type Skill = typeof skills.$inferSelect
 export type SkillRun = typeof skillRuns.$inferSelect
 export type AgentRun = typeof agentRuns.$inferSelect
+export type ChatSession = typeof chatSessions.$inferSelect
+export type ChatMessage = typeof chatMessages.$inferSelect
+export type Task = typeof tasks.$inferSelect
+export type Notification = typeof notifications.$inferSelect

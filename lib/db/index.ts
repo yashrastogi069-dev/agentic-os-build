@@ -21,7 +21,7 @@ const DB_PATH = process.env.AGENTIC_OS_DB_PATH ?? path.join(DB_DIR, "agentic-os.
  * Bump SCHEMA_VERSION whenever tables are added — the cached connection
  * (surviving HMR via globalThis) re-runs the idempotent DDL on mismatch.
  */
-const SCHEMA_VERSION = 3
+const SCHEMA_VERSION = 4
 
 type GlobalWithDb = typeof globalThis & {
   __agenticOsDb?: Database.Database
@@ -107,6 +107,64 @@ function initDb(): Database.Database {
       analyzed INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL DEFAULT 'New conversation',
+      summary TEXT,
+      summary_through_message_id INTEGER,
+      last_mode TEXT NOT NULL DEFAULT 'text',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      ui_parts TEXT,
+      brain TEXT,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_session
+      ON chat_messages (session_id, id);
+
+    CREATE TABLE IF NOT EXISTS tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      notes TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      due_at INTEGER,
+      remind_at INTEGER,
+      recurrence TEXT,
+      last_fired_at INTEGER,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      completed_at INTEGER
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tasks_reminder
+      ON tasks (status, remind_at);
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT,
+      dedupe_key TEXT NOT NULL UNIQUE,
+      task_id INTEGER,
+      payload TEXT,
+      deliver_at INTEGER NOT NULL,
+      channels TEXT NOT NULL DEFAULT '{}',
+      acked_at INTEGER,
+      snoozed_until INTEGER,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_notifications_pending
+      ON notifications (acked_at, deliver_at);
   `)
 
   if (vecAvailable) {
