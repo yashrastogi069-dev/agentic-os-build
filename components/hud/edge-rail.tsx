@@ -1,8 +1,16 @@
 'use client'
 
-import { Database, GearSix, Lightning, Note, Pulse, type Icon as PhosphorIcon } from '@phosphor-icons/react'
+import {
+  CheckSquare,
+  Database,
+  GearSix,
+  Lightning,
+  Note,
+  Pulse,
+  type Icon as PhosphorIcon,
+} from '@phosphor-icons/react'
 
-export type RightTab = 'feed' | 'notes' | 'memory' | 'skills' | 'settings'
+export type RightTab = 'feed' | 'notes' | 'memory' | 'skills' | 'settings' | 'tasks'
 
 /**
  * Order here IS the hotkey order (hud-shell.tsx's Alt+1..N handler indexes
@@ -24,6 +32,7 @@ export const RAIL_ITEMS: Array<{
   { tab: 'notes', label: 'Notes', icon: Note },
   { tab: 'memory', label: 'Memory', icon: Database },
   { tab: 'skills', label: 'Skills', icon: Lightning },
+  { tab: 'tasks', label: 'Tasks', icon: CheckSquare },
   { tab: 'settings', label: 'Settings', icon: GearSix },
 ]
 

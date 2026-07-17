@@ -9,9 +9,11 @@ import { MemoryPanel } from '@/components/memory-panel'
 import { NotesPanel } from '@/components/notes-panel'
 import { SkillsPanel } from '@/components/skills-panel'
 import { SettingsPanel } from '@/components/settings-panel'
+import { TasksPanel } from '@/components/tasks-panel'
 import { EdgeRail, RAIL_ITEMS, type RightTab } from '@/components/hud/edge-rail'
 import { PanelOverlay } from '@/components/hud/panel-overlay'
 import { CoreReadout } from '@/components/hud/core-readout'
+import { NotificationToasts } from '@/components/hud/notification-toasts'
 import { WakeWordListener } from '@/components/voice/wake-word-listener'
 import { useThemeStore } from '@/lib/theme-engine'
 
@@ -20,6 +22,7 @@ const PANEL_LABEL: Record<RightTab, string> = {
   notes: 'notes',
   memory: 'memory',
   skills: 'skills',
+  tasks: 'tasks',
   settings: 'settings',
 }
 
@@ -33,6 +36,8 @@ function renderPanel(tab: RightTab) {
       return <MemoryPanel />
     case 'skills':
       return <SkillsPanel />
+    case 'tasks':
+      return <TasksPanel />
     case 'settings':
       return <SettingsPanel />
   }
@@ -123,6 +128,7 @@ export function HudShell({ isDesktop }: { isDesktop: boolean }) {
     return (
       <>
         <WakeWordListener />
+        <NotificationToasts />
         <div className="pointer-events-none fixed inset-0 z-30 flex flex-col">
           <div className="hud-scrim-top pointer-events-none absolute inset-x-0 top-0 z-10 h-24" />
           <div className="pointer-events-auto relative z-20 pt-[env(safe-area-inset-top)]">
@@ -158,10 +164,10 @@ export function HudShell({ isDesktop }: { isDesktop: boolean }) {
   return (
     <div className="pointer-events-none fixed inset-0 z-30">
       <WakeWordListener />
-      {/* z-50 top-right is reserved for Phase 6's `notification-toasts.tsx`
-          (reminder/event toasts, per MASTER_PLAN_V2.md §3 4B and §5.2) — it
-          must sit above the status bar (z-20) and the panel overlay (z-40).
-          Nothing mounts there yet; this comment is the reservation. */}
+      {/* z-50 top-right — Phase 6's `notification-toasts.tsx` (reminder/event
+          toasts, per MASTER_PLAN_V2.md §3 4B and §5.2), sitting above the
+          status bar (z-20) and the panel overlay (z-40). */}
+      <NotificationToasts />
       <div className="hud-scrim-top pointer-events-none absolute inset-x-0 top-0 z-10 h-24" />
       <div className="pointer-events-auto absolute inset-x-0 top-0 z-20">
         <StatusBar onOpenSettings={() => togglePanel('settings')} />
