@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server"
 import { getRecentEvents } from "@/lib/events"
-import { syncGithubToFeed } from "@/lib/connectors/github"
-import { syncObsidianToFeed } from "@/lib/connectors/obsidian"
-import { syncTelegramToFeed, getTelegramSettings } from "@/lib/connectors/telegram"
-import { syncGoogleToFeed, isGoogleConnected } from "@/lib/connectors/google"
-import { syncAppleToFeed, getAppleSettings } from "@/lib/connectors/apple"
+import { CONNECTORS, getConnector } from "@/lib/connectors/registry"
 import { SEED_EVENTS } from "@/lib/seed-data"
 
 export const dynamic = "force-dynamic"
@@ -38,51 +34,38 @@ export async function GET(request: Request) {
   }
 }
 
-/** POST /api/feed — trigger connector syncs. { sources?: ("github"|"obsidian")[] } */
+/**
+ * POST /api/feed — trigger connector syncs. { sources?: string[] }
+ *
+ * Chunk 5A-4: replaces five copy-pasted sync blocks with one loop over the
+ * registry. Per id: no `sync` on the connector -> omitted from results; a
+ * config-only probe (`live: false`, so this never calls Telegram's getMe or
+ * any other live network check — it only reads local config/tokens) that
+ * reports `status: "off"` -> `{ skipped: true }` without calling sync; else
+ * try/catch the sync into `results[id]`, so one connector's failure can
+ * never 500 the whole route.
+ */
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     sources?: string[]
   }
-  const sources = body.sources ?? ["github", "obsidian", "telegram", "google", "apple"]
+  const sources = body.sources ?? CONNECTORS.filter((c) => c.sync).map((c) => c.id)
   const results: Record<string, { added?: number; error?: string; skipped?: boolean }> = {}
 
-  if (sources.includes("github")) {
-    try {
-      results.github = await syncGithubToFeed()
-    } catch (error) {
-      results.github = { error: error instanceof Error ? error.message : "sync failed" }
+  for (const id of sources) {
+    const connector = getConnector(id)
+    if (!connector?.sync) continue
+
+    const probeResult = await connector.probe({ live: false })
+    if (probeResult.status === "off") {
+      results[id] = { skipped: true }
+      continue
     }
-  }
-  if (sources.includes("obsidian")) {
+
     try {
-      results.obsidian = await syncObsidianToFeed()
+      results[id] = await connector.sync()
     } catch (error) {
-      results.obsidian = { error: error instanceof Error ? error.message : "sync failed" }
-    }
-  }
-  if (sources.includes("telegram")) {
-    try {
-      results.telegram = getTelegramSettings()?.botToken
-        ? await syncTelegramToFeed()
-        : { skipped: true }
-    } catch (error) {
-      results.telegram = { error: error instanceof Error ? error.message : "sync failed" }
-    }
-  }
-  if (sources.includes("google")) {
-    try {
-      results.google = isGoogleConnected() ? await syncGoogleToFeed() : { skipped: true }
-    } catch (error) {
-      results.google = { error: error instanceof Error ? error.message : "sync failed" }
-    }
-  }
-  if (sources.includes("apple")) {
-    try {
-      const apple = getAppleSettings()
-      results.apple =
-        apple?.appleId && apple?.appPassword ? await syncAppleToFeed() : { skipped: true }
-    } catch (error) {
-      results.apple = { error: error instanceof Error ? error.message : "sync failed" }
+      results[id] = { error: error instanceof Error ? error.message : "sync failed" }
     }
   }
 

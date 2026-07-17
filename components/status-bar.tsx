@@ -18,6 +18,13 @@ export interface HealthData {
   google: { credentials: boolean; connected: boolean }
   apple: { configured: boolean }
   voice: { whisper: boolean; piper: boolean }
+  // Chunk 5A-3: single source of truth for connector status, keyed by
+  // registry id (lib/connectors/registry.ts). Deliberately NOT imported from
+  // that file here — this is a client component, and registry.ts pulls in
+  // better-sqlite3/node:fs transitively via lib/settings, which breaks the
+  // client bundle (this happened once already; do not repeat it). The shape
+  // is just the JSON the health route already serializes.
+  connectors: Record<string, { label: string; status: 'ok' | 'warn' | 'off'; reason?: string }>
   chat: { brain: 'groq' | 'ollama'; groqModel: string }
   brain?: {
     active: string
@@ -34,11 +41,18 @@ export function useHealth() {
   return useSWR<HealthData>('/api/health', fetcher, { refreshInterval: 10_000 })
 }
 
+/** Reads a connector's dot state from health.connectors[id], defaulting to 'off' if absent (probe not yet in). */
+function connectorState(data: HealthData, id: string): DotState {
+  return data.connectors?.[id]?.status ?? 'off'
+}
+
 /**
- * Data-driven connector dots — Phase 4B. One entry per honest probe the
- * health route already returns; adding a 10th connector later is a one-line
- * append here, not a new `<Dot>` call site. `mcp` isn't a live connector
- * (it's "is a key set"), kept alongside the others per the original layout.
+ * Data-driven connector dots — Phase 4B, flipped onto the registry's
+ * `connectors` map in chunk 5A-3. One entry per connector the registry
+ * knows about; adding a new one later is a one-line append here, not a new
+ * `<Dot>` call site. `db`, `ollama`, and `mcp` aren't registry connectors
+ * (db/ollama are infra, mcp is "is a key set"), so they keep their own
+ * hardcoded checks against the top-level health fields, same as before.
  */
 const DOT_DESCRIPTORS: Array<{ id: string; label: string; state: (data: HealthData) => DotState }> = [
   { id: 'db', label: 'db', state: (data) => (data.db.ok ? (data.db.vec ? 'ok' : 'warn') : 'off') },
@@ -47,25 +61,12 @@ const DOT_DESCRIPTORS: Array<{ id: string; label: string; state: (data: HealthDa
     label: 'ollama',
     state: (data) => (data.ollama.ok ? (data.ollama.embeddingModel.pulled ? 'ok' : 'warn') : 'off'),
   },
-  {
-    id: 'obsidian',
-    label: 'obsidian',
-    state: (data) => (data.obsidian.ok ? 'ok' : data.obsidian.configured ? 'warn' : 'off'),
-  },
-  { id: 'github', label: 'github', state: (data) => (data.github.configured ? 'ok' : 'off') },
-  { id: 'telegram', label: 'telegram', state: (data) => (data.telegram.configured ? 'ok' : 'off') },
-  {
-    id: 'google',
-    label: 'google',
-    state: (data) => (data.google.connected ? 'ok' : data.google.credentials ? 'warn' : 'off'),
-  },
-  { id: 'apple', label: 'apple', state: (data) => (data.apple.configured ? 'ok' : 'off') },
-  {
-    id: 'voice',
-    label: 'voice',
-    state: (data) =>
-      data.voice.whisper && data.voice.piper ? 'ok' : data.voice.whisper || data.voice.piper ? 'warn' : 'off',
-  },
+  { id: 'obsidian', label: 'obsidian', state: (data) => connectorState(data, 'obsidian') },
+  { id: 'github', label: 'github', state: (data) => connectorState(data, 'github') },
+  { id: 'telegram', label: 'telegram', state: (data) => connectorState(data, 'telegram') },
+  { id: 'google', label: 'google', state: (data) => connectorState(data, 'google') },
+  { id: 'apple', label: 'apple', state: (data) => connectorState(data, 'apple') },
+  { id: 'voice', label: 'voice', state: (data) => connectorState(data, 'voice') },
   { id: 'mcp', label: 'mcp', state: (data) => (data.mcp.keySet ? 'ok' : 'off') },
 ]
 
