@@ -38,7 +38,9 @@ interface WakeWordStoreState {
 }
 
 export const useWakeWordStore = create<WakeWordStoreState>((set) => ({
-  enabled: true,
+  // Defaults off (Yash 2026-07-17): Jarvis activates only via hotkey/reactor
+  // click, not always-on background listening. See lib/wake-words.ts.
+  enabled: false,
   setEnabled: (enabled) => {
     set({ enabled })
     // Persist through the server route — this module is client-side and

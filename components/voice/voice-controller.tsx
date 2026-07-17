@@ -7,8 +7,6 @@ import { EnergyVad } from '@/lib/voice/vad'
 import { SentenceChunker } from '@/lib/voice/sentence-chunker'
 import { TtsQueue } from '@/lib/voice/tts-queue'
 
-/** How long the mic stays open for a follow-up turn after Jarvis finishes speaking. */
-const FOLLOW_UP_WINDOW_MS = 7000
 /** Throttle for writing live mic level into the theme store. */
 const MIC_LEVEL_WRITE_INTERVAL_MS = 75
 
@@ -47,9 +45,7 @@ export function VoiceController({
 
   const stateRef = useRef(state)
   stateRef.current = state
-  const followUpTimerRef = useRef<number | null>(null)
   const lastMicWriteRef = useRef(0)
-  const explicitlyStoppedRef = useRef(false)
   const seenTextLengthRef = useRef(0)
   const wasStreamingRef = useRef(false)
 
@@ -67,13 +63,6 @@ export function VoiceController({
     )
   }, [state])
 
-  function clearFollowUpTimer() {
-    if (followUpTimerRef.current !== null) {
-      window.clearTimeout(followUpTimerRef.current)
-      followUpTimerRef.current = null
-    }
-  }
-
   function writeMicLevel(level: number) {
     const now = performance.now()
     if (now - lastMicWriteRef.current < MIC_LEVEL_WRITE_INTERVAL_MS) return
@@ -86,12 +75,12 @@ export function VoiceController({
       const queue = new TtsQueue()
       queue.onPlaybackStateChange = (playing) => {
         if (!playing && stateRef.current === 'speaking') {
-          // Last chunk's audio has genuinely finished — open the follow-up window.
-          if (explicitlyStoppedRef.current) {
-            transitionToIdle()
-          } else {
-            beginListening(true)
-          }
+          // Jarvis finished speaking. Voice is strictly turn-based now: one
+          // press of the hotkey -> one utterance -> one reply -> mic closes.
+          // Auto-reopening the mic here previously caused Jarvis's own
+          // speech (and room noise) to be re-transcribed and dumped back
+          // into the chat as new user messages.
+          void stopEverything()
         }
       }
       ttsQueueRef.current = queue
@@ -129,7 +118,6 @@ export function VoiceController({
   }
 
   async function finishListeningTurn(recorder: WorkletRecorder) {
-    clearFollowUpTimer()
     setState('transcribing')
     useThemeStore.setState({ micLevel: 0 })
     try {
@@ -150,33 +138,12 @@ export function VoiceController({
       onSendMessage(json.text)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'transcription failed')
-      // Silence, no clip to send — go back to listening rather than dying.
-      beginListening(false)
+      // Nothing usable was said — end the turn rather than looping the mic.
+      await stopEverything()
     }
-  }
-
-  function beginListening(followUp: boolean) {
-    clearFollowUpTimer()
-    if (followUp) {
-      followUpTimerRef.current = window.setTimeout(() => {
-        if (stateRef.current === 'listening') {
-          transitionToIdle()
-        }
-      }, FOLLOW_UP_WINDOW_MS)
-    }
-    setState('listening')
-  }
-
-  function transitionToIdle() {
-    clearFollowUpTimer()
-    vadRef.current?.reset()
-    useThemeStore.setState({ micLevel: 0 })
-    setState('idle')
   }
 
   async function stopEverything() {
-    explicitlyStoppedRef.current = true
-    clearFollowUpTimer()
     ttsQueueRef.current?.stop()
     useThemeStore.setState({ micLevel: 0 })
     const recorder = recorderRef.current
@@ -191,11 +158,10 @@ export function VoiceController({
   async function toggle() {
     setError('')
     if (state === 'idle') {
-      explicitlyStoppedRef.current = false
       try {
         await ensureRecorder()
         await ensureTtsQueue()
-        beginListening(false)
+        setState('listening')
       } catch (err) {
         setError(
           err instanceof Error && err.name === 'NotAllowedError'
@@ -247,9 +213,9 @@ export function VoiceController({
         if (stateRef.current === 'thinking') setState('speaking')
         void ensureTtsQueue().then((queue) => queue.enqueue(final))
       } else if (stateRef.current === 'thinking') {
-        // No speakable content came back at all — don't hang in 'thinking'.
-        if (explicitlyStoppedRef.current) transitionToIdle()
-        else beginListening(true)
+        // No speakable content came back at all — end the turn rather than
+        // hanging in 'thinking' or reopening the mic.
+        void stopEverything()
       }
     }
     wasStreamingRef.current = isAssistantStreaming
@@ -259,7 +225,6 @@ export function VoiceController({
   // Full teardown on unmount.
   useEffect(() => {
     return () => {
-      clearFollowUpTimer()
       ttsQueueRef.current?.stop()
       recorderRef.current?.stop().catch(() => undefined)
     }

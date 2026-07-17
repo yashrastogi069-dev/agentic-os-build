@@ -100,9 +100,16 @@ export function setWakeWordEnabled(id: string, enabled: boolean): WakeWordEntry 
 
 /* ---------- Background listening toggle ---------- */
 
+/**
+ * Defaults to OFF (Yash 2026-07-17): always-on background listening was
+ * transcribing every sound in the room, flooding the STT sidecar (198 calls
+ * in one session, latency climbing past 14s) with false triggers. Jarvis now
+ * activates ONLY on explicit action (hotkey / reactor click); this toggle
+ * remains available for anyone who wants to opt back in.
+ */
 export function getWakeListeningEnabled(): boolean {
   const config = getConnectorConfig<{ enabled: boolean }>(LISTENING_CONNECTOR_KEY)
-  return config?.enabled !== false
+  return config?.enabled === true
 }
 
 export function setWakeListeningEnabled(enabled: boolean): void {
