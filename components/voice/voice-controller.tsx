@@ -10,6 +10,58 @@ import { TtsQueue } from '@/lib/voice/tts-queue'
 /** Throttle for writing live mic level into the theme store. */
 const MIC_LEVEL_WRITE_INTERVAL_MS = 75
 
+/**
+ * Per-stage latency marks for one voice turn (Phase 6 Chunk F). Populated as
+ * the turn progresses; once every stage is known, sendLatencyReport() derives
+ * the deltas and fires a non-blocking POST to /api/voice/latency. `turnAt` is
+ * wall-clock (for the DB row); everything else uses performance.now() so
+ * deltas are immune to clock adjustments.
+ */
+interface TurnLatencyMarks {
+  turnAt: number
+  turnStartPerf: number
+  vadMs: number
+  sttDonePerf: number | null
+  brainFirstSentencePerf: number | null
+  ttsFirstChunkPerf: number | null
+}
+
+/** Logs a clearly greppable line and fire-and-forget POSTs the completed turn. Never blocks or throws into the playback path. */
+function sendLatencyReport(marks: TurnLatencyMarks) {
+  if (
+    marks.sttDonePerf === null ||
+    marks.brainFirstSentencePerf === null ||
+    marks.ttsFirstChunkPerf === null
+  ) {
+    return
+  }
+  const sttMs = marks.sttDonePerf - marks.turnStartPerf
+  const brainFirstSentenceMs = marks.brainFirstSentencePerf - marks.sttDonePerf
+  const ttsFirstChunkMs = marks.ttsFirstChunkPerf - marks.brainFirstSentencePerf
+  const totalMs = marks.ttsFirstChunkPerf - marks.turnStartPerf
+
+  console.log(
+    `[voice-latency] vad=${marks.vadMs}ms stt=${Math.round(sttMs)}ms brain=${Math.round(brainFirstSentenceMs)}ms tts=${Math.round(ttsFirstChunkMs)}ms total=${Math.round(totalMs)}ms`,
+  )
+
+  const payload = {
+    turnAt: marks.turnAt,
+    vadMs: marks.vadMs,
+    sttMs,
+    brainFirstSentenceMs,
+    ttsFirstChunkMs,
+    totalMs,
+  }
+  fetch('/api/voice/latency', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    keepalive: true,
+  }).catch(() => {
+    // Observability only — a failed write must never disrupt the voice pipeline.
+  })
+}
+
 type VoiceControllerState =
   | 'idle'
   | 'listening'
@@ -48,6 +100,7 @@ export function VoiceController({
   const lastMicWriteRef = useRef(0)
   const seenTextLengthRef = useRef(0)
   const wasStreamingRef = useRef(false)
+  const turnMarksRef = useRef<TurnLatencyMarks | null>(null)
 
   // Report coreState transitions upward.
   useEffect(() => {
@@ -74,6 +127,13 @@ export function VoiceController({
     if (!ttsQueueRef.current) {
       const queue = new TtsQueue()
       queue.onPlaybackStateChange = (playing) => {
+        if (playing) {
+          const marks = turnMarksRef.current
+          if (marks && marks.ttsFirstChunkPerf === null) {
+            marks.ttsFirstChunkPerf = performance.now()
+            sendLatencyReport(marks)
+          }
+        }
         if (!playing && stateRef.current === 'speaking') {
           // Jarvis finished speaking. Voice is strictly turn-based now: one
           // press of the hotkey -> one utterance -> one reply -> mic closes.
@@ -120,6 +180,16 @@ export function VoiceController({
   async function finishListeningTurn(recorder: WorkletRecorder) {
     setState('transcribing')
     useThemeStore.setState({ micLevel: 0 })
+    // Speech-end detected — start of the turn's latency clock.
+    const turnStartPerf = performance.now()
+    turnMarksRef.current = {
+      turnAt: Date.now(),
+      turnStartPerf,
+      vadMs: vadRef.current?.hangoverMs ?? 0,
+      sttDonePerf: null,
+      brainFirstSentencePerf: null,
+      ttsFirstChunkPerf: null,
+    }
     try {
       const wav = recorder.finishUtterance()
       const res = await fetch('/api/voice/transcribe', {
@@ -131,6 +201,7 @@ export function VoiceController({
       if (!res.ok || !json.text) {
         throw new Error(json.error ?? 'nothing transcribed')
       }
+      if (turnMarksRef.current) turnMarksRef.current.sttDonePerf = performance.now()
       chunkerRef.current.reset()
       seenTextLengthRef.current = 0
       wasStreamingRef.current = false
@@ -138,6 +209,8 @@ export function VoiceController({
       onSendMessage(json.text)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'transcription failed')
+      // Nothing usable was said — no completed turn to report.
+      turnMarksRef.current = null
       // Nothing usable was said — end the turn rather than looping the mic.
       await stopEverything()
     }
@@ -200,6 +273,10 @@ export function VoiceController({
       seenTextLengthRef.current = total
       const chunks = chunkerRef.current.push(delta)
       if (chunks.length > 0) {
+        const marks = turnMarksRef.current
+        if (marks && marks.brainFirstSentencePerf === null) {
+          marks.brainFirstSentencePerf = performance.now()
+        }
         if (stateRef.current === 'thinking') setState('speaking')
         void ensureTtsQueue().then((queue) => {
           for (const chunk of chunks) queue.enqueue(chunk)
@@ -210,6 +287,10 @@ export function VoiceController({
     if (!isAssistantStreaming && wasStreamingRef.current) {
       const final = chunkerRef.current.finalize()
       if (final) {
+        const marks = turnMarksRef.current
+        if (marks && marks.brainFirstSentencePerf === null) {
+          marks.brainFirstSentencePerf = performance.now()
+        }
         if (stateRef.current === 'thinking') setState('speaking')
         void ensureTtsQueue().then((queue) => queue.enqueue(final))
       } else if (stateRef.current === 'thinking') {
@@ -259,7 +340,7 @@ export function VoiceController({
         aria-label={label}
         className={`rounded-sm border px-3 py-1 font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-40 ${
           state === 'listening'
-            ? 'animate-pulse border-destructive/60 bg-destructive/15 text-destructive'
+            ? 'animate-pulse border-primary/60 bg-primary/15 text-primary'
             : state === 'speaking'
               ? 'border-accent/60 bg-accent/15 text-accent'
               : 'border-[oklch(from_var(--accent-live)_l_c_h_/_30%)] text-primary hover:border-[oklch(from_var(--accent-live)_l_c_h_/_55%)]'

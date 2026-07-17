@@ -137,7 +137,7 @@ export function NotificationToasts() {
         <div
           key={toast.id}
           role="status"
-          className="hud-glass hud-glass-accent-edge enter-fade-up pointer-events-auto flex flex-col gap-2 rounded-[var(--radius-xl)] p-3"
+          className="hud-glass enter-fade-up pointer-events-auto flex flex-col gap-2 rounded-[var(--radius-xl)] p-3"
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-start gap-2">

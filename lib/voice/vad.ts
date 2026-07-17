@@ -47,6 +47,11 @@ export class EnergyVad {
     return this._state
   }
 
+  /** The configured silence-sustain window (ms) that gates onSpeechEnd — exposed for latency instrumentation. */
+  get hangoverMs(): number {
+    return this.config.speechEndMs
+  }
+
   /** Reset the state machine (e.g. after barge-in stop, or between utterances). */
   reset(): void {
     this._state = "silence"

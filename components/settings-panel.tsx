@@ -6,6 +6,9 @@ import { AccentButton, GhostButton, HudInput, PanelSectionHeading, StaggerList }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
+type AssistantTone = 'professional' | 'casual' | 'warm' | 'direct'
+type AssistantVerbosity = 'brief' | 'balanced' | 'detailed'
+
 type Settings = {
   chat: { brain: 'groq' | 'ollama'; groqModel: string }
   mcp: { key: string }
@@ -14,7 +17,21 @@ type Settings = {
   google: { credentials: boolean; connected: boolean }
   apple: { configured: boolean; appleId: string }
   defaults: { groqModel: string }
+  assistant: { tone: AssistantTone; verbosity: AssistantVerbosity; address: string }
 }
+
+type VoiceLatencySummary = {
+  count: number
+  p50TotalMs: number
+  p90TotalMs: number
+  p50SttMs: number
+  p50BrainFirstSentenceMs: number
+  p50TtsFirstChunkMs: number
+  lastTurnAt: number | null
+}
+
+const TONE_OPTIONS: AssistantTone[] = ['professional', 'casual', 'warm', 'direct']
+const VERBOSITY_OPTIONS: AssistantVerbosity[] = ['brief', 'balanced', 'detailed']
 
 type BrainStatus = 'active' | 'ready' | 'cooling' | 'down'
 
@@ -52,6 +69,9 @@ async function postSettings(body: Record<string, unknown>) {
 export function SettingsPanel() {
   const { data } = useSWR<Settings>('/api/settings', fetcher)
   const { data: health } = useSWR<Health>('/api/health', fetcher, { refreshInterval: 10_000 })
+  const { data: voiceLatency } = useSWR<VoiceLatencySummary>('/api/voice/latency', fetcher, {
+    refreshInterval: 15_000,
+  })
   const [obsidianKey, setObsidianKey] = useState('')
   const [telegramToken, setTelegramToken] = useState('')
   const [googleClientId, setGoogleClientId] = useState('')
@@ -63,6 +83,8 @@ export function SettingsPanel() {
   const [syncing, setSyncing] = useState(false)
   const [indexing, setIndexing] = useState(false)
   const [statusLine, setStatusLine] = useState('')
+  const [addressInput, setAddressInput] = useState('')
+  const [savingPref, setSavingPref] = useState<'tone' | 'verbosity' | 'address' | null>(null)
 
   if (!data) {
     return (
@@ -73,6 +95,13 @@ export function SettingsPanel() {
   }
 
   const mcpCommand = `claude mcp add --transport http agentic-os http://localhost:3000/api/mcp --header "Authorization: Bearer ${data.mcp.key}"`
+
+  async function setPref(key: 'tone' | 'verbosity' | 'address', value: string) {
+    setSavingPref(key)
+    const json = await postSettings({ action: 'setAssistant', key, value })
+    setStatusLine(json.error ? `[error] ${json.error}` : `${key} updated`)
+    setSavingPref(null)
+  }
 
   async function copy(text: string, label: string) {
     await navigator.clipboard.writeText(text)
@@ -112,6 +141,111 @@ export function SettingsPanel() {
           auto-routed: gemini → groq → openrouter → nvidia → ollama. failover is
           automatic on rate-limit or outage.
         </p>
+      </section>
+
+      {/* Assistant tone/verbosity/address — same values setPreference (agent tool) writes to connector_settings.assistant; editing here calls the identical setAssistantPreference() path. */}
+      <section>
+        <PanelSectionHeading as="h3" className="mb-2">
+          assistant preferences
+        </PanelSectionHeading>
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2">
+            <span className="w-16 shrink-0 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              tone
+            </span>
+            <select
+              value={data.assistant.tone}
+              disabled={savingPref === 'tone'}
+              onChange={(e) => void setPref('tone', e.target.value)}
+              aria-label="Assistant tone"
+              className="flex-1 rounded-sm border border-border bg-[oklch(0.1_0.02_250_/_55%)] px-2 py-1 font-mono text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+            >
+              {TONE_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-16 shrink-0 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              verbosity
+            </span>
+            <select
+              value={data.assistant.verbosity}
+              disabled={savingPref === 'verbosity'}
+              onChange={(e) => void setPref('verbosity', e.target.value)}
+              aria-label="Assistant verbosity"
+              className="flex-1 rounded-sm border border-border bg-[oklch(0.1_0.02_250_/_55%)] px-2 py-1 font-mono text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+            >
+              {VERBOSITY_OPTIONS.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const v = addressInput.trim()
+              if (!v) return
+              void setPref('address', v)
+              setAddressInput('')
+            }}
+          >
+            <span className="w-16 shrink-0 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              address
+            </span>
+            <HudInput
+              value={addressInput}
+              onChange={(e) => setAddressInput(e.target.value)}
+              placeholder={data.assistant.address}
+              aria-label="How the assistant addresses you"
+            />
+            <AccentButton size="xs" type="submit" disabled={savingPref === 'address' || !addressInput.trim()}>
+              save
+            </AccentButton>
+          </form>
+        </div>
+        <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted-foreground">
+          currently: {data.assistant.tone} · {data.assistant.verbosity} · addresses you as{' '}
+          {data.assistant.address}. also settable by just telling the agent (e.g. &quot;be more
+          casual&quot;).
+        </p>
+      </section>
+
+      {/* Voice turn latency — Phase 6 Chunk F. Read-only p50/p90 over the last 50 completed turns; per-turn rows persist in voice_latency (see lib/voice/latency.ts). */}
+      <section>
+        <PanelSectionHeading as="h3" className="mb-2">
+          voice latency
+        </PanelSectionHeading>
+        {!voiceLatency || voiceLatency.count === 0 ? (
+          <p className="font-mono text-[10px] text-muted-foreground">
+            no completed voice turns logged yet.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-foreground">
+                first-audio p50 {voiceLatency.p50TotalMs} ms
+              </span>
+              <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                p90 {voiceLatency.p90TotalMs} ms
+              </span>
+            </div>
+            <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+              stt p50 {voiceLatency.p50SttMs} ms · brain-first-sentence p50{' '}
+              {voiceLatency.p50BrainFirstSentenceMs} ms · tts-first-chunk p50{' '}
+              {voiceLatency.p50TtsFirstChunkMs} ms
+            </p>
+            <p className="font-mono text-[10px] text-muted-foreground">
+              over last {voiceLatency.count} turn{voiceLatency.count === 1 ? '' : 's'} · budget
+              (§5.4): p50 ≤ 1800 ms, p90 ≤ 3000 ms
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Obsidian */}

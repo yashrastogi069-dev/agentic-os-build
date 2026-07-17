@@ -192,6 +192,35 @@ export const notifications = sqliteTable("notifications", {
     .$defaultFn(() => new Date()),
 })
 
+/**
+ * Per-stage voice turn latency (Phase 6 Chunk F). One row per completed voice
+ * turn that actually reached playback (turns that end with no speakable
+ * content, e.g. empty transcription, are never logged — there is nothing to
+ * measure). Written fire-and-forget from the client via POST
+ * /api/voice/latency right after the first TTS chunk starts playing, so
+ * logging never sits on the hot path. `turnAt` is the wall-clock moment
+ * speech-end was detected (VAD firing); the *Ms columns are stage deltas
+ * measured client-side with performance.now(). See tasks/PHASE6_BENCH.md and
+ * MASTER_PLAN_V2.md §5.4 for the budget these numbers are compared against.
+ */
+export const voiceLatency = sqliteTable("voice_latency", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  turnAt: integer("turn_at", { mode: "timestamp_ms" }).notNull(),
+  /** VAD hangover — the configured silence-sustain window before speech-end fires. */
+  vadMs: integer("vad_ms").notNull(),
+  /** Speech-end detected -> transcribe response received. */
+  sttMs: integer("stt_ms").notNull(),
+  /** Transcribe response received -> first complete sentence available from the brain stream. */
+  brainFirstSentenceMs: integer("brain_first_sentence_ms").notNull(),
+  /** First sentence ready -> first TTS audio actually starts playing. */
+  ttsFirstChunkMs: integer("tts_first_chunk_ms").notNull(),
+  /** Speech-end detected -> first TTS audio starts playing (the §5.4 "first-audio" budget). */
+  totalMs: integer("total_ms").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
 export type Memory = typeof memories.$inferSelect
 export type Event = typeof events.$inferSelect
 export type ConnectorSetting = typeof connectorSettings.$inferSelect
@@ -202,3 +231,4 @@ export type ChatSession = typeof chatSessions.$inferSelect
 export type ChatMessage = typeof chatMessages.$inferSelect
 export type Task = typeof tasks.$inferSelect
 export type Notification = typeof notifications.$inferSelect
+export type VoiceLatency = typeof voiceLatency.$inferSelect

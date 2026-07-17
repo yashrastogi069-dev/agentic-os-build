@@ -10,6 +10,7 @@ import {
 import { getTelegramSettings } from "@/lib/connectors/telegram"
 import { getGoogleSettings, isGoogleConnected } from "@/lib/connectors/google"
 import { getAppleSettings } from "@/lib/connectors/apple"
+import { getAssistantPreferences, setAssistantPreference } from "@/lib/assistant/prompt"
 
 export const dynamic = "force-dynamic"
 
@@ -28,6 +29,7 @@ export async function GET() {
     google: { credentials: Boolean(google), connected: isGoogleConnected() },
     apple: { configured: Boolean(apple), appleId: apple?.appleId ?? "" },
     defaults: { groqModel: DEFAULT_GROQ_MODEL },
+    assistant: getAssistantPreferences(),
   })
 }
 
@@ -35,6 +37,7 @@ export async function GET() {
  * POST /api/settings
  * { action: "setChat", brain, groqModel? }
  * { action: "setObsidian", apiKey, baseUrl? }
+ * { action: "setAssistant", key: "tone" | "verbosity" | "address", value }
  * { action: "regenerateMcpKey" }
  */
 export async function POST(request: Request) {
@@ -49,6 +52,8 @@ export async function POST(request: Request) {
     clientSecret?: string
     appleId?: string
     appPassword?: string
+    key?: string
+    value?: string
   }
 
   switch (body.action) {
@@ -108,6 +113,26 @@ export async function POST(request: Request) {
         appPassword: body.appPassword.trim(),
       })
       return NextResponse.json({ ok: true })
+    }
+    case "setAssistant": {
+      if (body.key !== "tone" && body.key !== "verbosity" && body.key !== "address") {
+        return NextResponse.json(
+          { error: "key must be one of: tone, verbosity, address" },
+          { status: 400 },
+        )
+      }
+      if (typeof body.value !== "string" || !body.value.trim()) {
+        return NextResponse.json({ error: "value is required" }, { status: 400 })
+      }
+      try {
+        const assistant = setAssistantPreference(body.key, body.value.trim())
+        return NextResponse.json({ ok: true, assistant })
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "failed to save preference" },
+          { status: 400 },
+        )
+      }
     }
     case "regenerateMcpKey": {
       const key = regenerateMcpKey()

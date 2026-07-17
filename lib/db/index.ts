@@ -21,7 +21,7 @@ const DB_PATH = process.env.AGENTIC_OS_DB_PATH ?? path.join(DB_DIR, "agentic-os.
  * Bump SCHEMA_VERSION whenever tables are added — the cached connection
  * (surviving HMR via globalThis) re-runs the idempotent DDL on mismatch.
  */
-const SCHEMA_VERSION = 4
+const SCHEMA_VERSION = 5
 
 type GlobalWithDb = typeof globalThis & {
   __agenticOsDb?: Database.Database
@@ -165,6 +165,20 @@ function initDb(): Database.Database {
 
     CREATE INDEX IF NOT EXISTS idx_notifications_pending
       ON notifications (acked_at, deliver_at);
+
+    CREATE TABLE IF NOT EXISTS voice_latency (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      turn_at INTEGER NOT NULL,
+      vad_ms INTEGER NOT NULL,
+      stt_ms INTEGER NOT NULL,
+      brain_first_sentence_ms INTEGER NOT NULL,
+      tts_first_chunk_ms INTEGER NOT NULL,
+      total_ms INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_voice_latency_turn_at
+      ON voice_latency (turn_at);
   `)
 
   if (vecAvailable) {
