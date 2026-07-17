@@ -10,12 +10,16 @@ import { getConnectorConfig, setConnectorConfig } from "@/lib/settings"
  * pastes client id/secret in Settings, clicks connect. The refresh token is
  * stored in connector_settings — tokens never leave the machine.
  *
- * Read-only scopes only: calendar.readonly + gmail.readonly.
+ * Scopes: calendar (read/write) + gmail.readonly + gmail.send. Existing
+ * connections made before write support was added will need to reconnect
+ * in Settings (Google's incremental-auth flow re-prompts consent) before
+ * write tools work — read tools are unaffected.
  */
 
 const SCOPES = [
-  "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/calendar",
   "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
 ].join(" ")
 
 export interface GoogleSettings extends Record<string, unknown> {
@@ -120,6 +124,18 @@ async function gFetch<T>(url: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+async function gPost<T>(url: string, body: Record<string, unknown>): Promise<T> {
+  const token = await getAccessToken()
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!res.ok) throw new Error(`Google API POST failed: ${res.status} ${await res.text()}`)
+  return res.json() as Promise<T>
+}
+
 /* ---------- Calendar ---------- */
 
 export async function getUpcomingEvents(days = 7, limit = 20) {
@@ -154,6 +170,26 @@ export async function getUpcomingEvents(days = 7, limit = 20) {
   }))
 }
 
+export async function createCalendarEvent(
+  summary: string,
+  startISO: string,
+  endISO: string,
+  description?: string,
+  location?: string,
+): Promise<{ id: string; url?: string }> {
+  const data = await gPost<{ id: string; htmlLink?: string }>(
+    "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+    {
+      summary,
+      description,
+      location,
+      start: { dateTime: startISO },
+      end: { dateTime: endISO },
+    },
+  )
+  return { id: data.id, url: data.htmlLink }
+}
+
 /* ---------- Gmail ---------- */
 
 export async function getRecentEmails(limit = 15) {
@@ -184,6 +220,22 @@ export async function getRecentEmails(limit = 15) {
       date: Number(d.internalDate),
     }
   })
+}
+
+/** Base64url-encode (no padding, - and _) per the Gmail API's `raw` message spec. */
+function base64UrlEncode(input: string): string {
+  return Buffer.from(input, "utf-8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "")
+}
+
+export async function sendGmailMessage(to: string, subject: string, body: string): Promise<{ id: string }> {
+  const message = `To: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n${body}`
+  const raw = base64UrlEncode(message)
+  const data = await gPost<{ id: string }>("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", { raw })
+  return { id: data.id }
 }
 
 /* ---------- Feed sync ---------- */
@@ -237,5 +289,40 @@ export const googleTools = {
       limit: z.number().int().min(1).max(25).optional(),
     }),
     execute: async ({ limit }) => ({ emails: await getRecentEmails(limit ?? 10) }),
+  }),
+  createCalendarEvent: tool({
+    description: "Create a new event on the user's primary Google Calendar.",
+    inputSchema: z.object({
+      summary: z.string().describe("Event title."),
+      description: z.string().optional(),
+      startISO: z.string().describe("Start time as an ISO 8601 datetime."),
+      endISO: z.string().describe("End time as an ISO 8601 datetime."),
+      location: z.string().optional(),
+    }),
+    execute: async ({ summary, description, startISO, endISO, location }) => {
+      const result = await createCalendarEvent(summary, startISO, endISO, description, location)
+      return { created: true, ...result }
+    },
+  }),
+  sendGmail: tool({
+    description:
+      "Send an email from the user's Gmail account. Visible to other people and hard to undo, so this requires explicit confirmation: call with confirmed:false first to preview the exact to/subject/body, show it to the user, and only call again with confirmed:true after they explicitly approve it in this turn or a prior turn.",
+    inputSchema: z.object({
+      to: z.string().describe("Recipient email address."),
+      subject: z.string(),
+      body: z.string(),
+      confirmed: z
+        .boolean()
+        .describe(
+          "Set true ONLY after the user has explicitly approved the exact content in this turn or a prior turn of this conversation. If the user has not confirmed, call this tool with confirmed:false first to show them exactly what would be sent/posted, and wait for their explicit yes before calling again with confirmed:true.",
+        ),
+    }),
+    execute: async ({ to, subject, body, confirmed }) => {
+      if (!confirmed) {
+        return { sent: false, preview: { to, subject, body }, requiresConfirmation: true }
+      }
+      const result = await sendGmailMessage(to, subject, body)
+      return { sent: true, ...result }
+    },
   }),
 }

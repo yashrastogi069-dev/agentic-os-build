@@ -32,6 +32,37 @@ async function ghFetch<T>(pathname: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+async function ghPost<T>(pathname: string, body: Record<string, unknown>): Promise<T> {
+  const res = await fetch(`${GITHUB_API}${pathname}`, {
+    method: "POST",
+    headers: { ...githubHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!res.ok) {
+    throw new Error(`GitHub API POST ${pathname} failed: ${res.status} ${await res.text()}`)
+  }
+  return res.json() as Promise<T>
+}
+
+export async function createIssue(
+  repo: string,
+  title: string,
+  body: string,
+): Promise<{ number: number; url: string }> {
+  const data = await ghPost<{ number: number; html_url: string }>(`/repos/${repo}/issues`, { title, body })
+  return { number: data.number, url: data.html_url }
+}
+
+export async function commentOnIssue(
+  repo: string,
+  issueNumber: number,
+  body: string,
+): Promise<{ url: string }> {
+  const data = await ghPost<{ html_url: string }>(`/repos/${repo}/issues/${issueNumber}/comments`, { body })
+  return { url: data.html_url }
+}
+
 export async function getNotifications(limit = 20) {
   const data = await ghFetch<
     Array<{
@@ -188,5 +219,47 @@ export const githubTools = {
       limit: z.number().int().min(1).max(30).optional(),
     }),
     execute: async ({ repo, limit }) => ({ commits: await getRecentCommits(repo, limit ?? 10) }),
+  }),
+  createGithubIssue: tool({
+    description:
+      "Create a new GitHub issue. Visible to other people, so this requires explicit confirmation: call with confirmed:false first to preview the exact title/body, show it to the user, and only call again with confirmed:true after they explicitly approve it in this turn or a prior turn.",
+    inputSchema: z.object({
+      repo: z.string().describe("Repository in 'owner/repo' format"),
+      title: z.string(),
+      body: z.string(),
+      confirmed: z
+        .boolean()
+        .describe(
+          "Set true ONLY after the user has explicitly approved the exact content in this turn or a prior turn of this conversation. If the user has not confirmed, call this tool with confirmed:false first to show them exactly what would be sent/posted, and wait for their explicit yes before calling again with confirmed:true.",
+        ),
+    }),
+    execute: async ({ repo, title, body, confirmed }) => {
+      if (!confirmed) {
+        return { sent: false, preview: { repo, title, body }, requiresConfirmation: true }
+      }
+      const result = await createIssue(repo, title, body)
+      return { sent: true, ...result }
+    },
+  }),
+  commentOnGithubIssue: tool({
+    description:
+      "Post a comment on a GitHub issue or pull request (works for both via GitHub's issues comment endpoint). Visible to other people, so this requires explicit confirmation: call with confirmed:false first to preview the exact comment body, show it to the user, and only call again with confirmed:true after they explicitly approve it in this turn or a prior turn.",
+    inputSchema: z.object({
+      repo: z.string().describe("Repository in 'owner/repo' format"),
+      issueNumber: z.number().int().min(1),
+      body: z.string(),
+      confirmed: z
+        .boolean()
+        .describe(
+          "Set true ONLY after the user has explicitly approved the exact content in this turn or a prior turn of this conversation. If the user has not confirmed, call this tool with confirmed:false first to show them exactly what would be sent/posted, and wait for their explicit yes before calling again with confirmed:true.",
+        ),
+    }),
+    execute: async ({ repo, issueNumber, body, confirmed }) => {
+      if (!confirmed) {
+        return { sent: false, preview: { repo, issueNumber, body }, requiresConfirmation: true }
+      }
+      const result = await commentOnIssue(repo, issueNumber, body)
+      return { sent: true, ...result }
+    },
   }),
 }

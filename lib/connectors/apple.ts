@@ -192,6 +192,69 @@ export async function getAppleEvents(days = 7): Promise<
   return all.sort((a, b) => a.start.localeCompare(b.start))
 }
 
+function toIcsUtc(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) throw new Error(`Invalid date: ${iso}`)
+  return d.toISOString().replace(/[-:]|\.\d{3}/g, "")
+}
+
+function escapeIcsText(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\\;").replace(/\n/g, "\\n")
+}
+
+/**
+ * Create a new event by PUTting a minimal .ics VEVENT resource into the
+ * user's first discovered calendar collection (RFC 5545 / RFC 4791).
+ */
+export async function createAppleEvent(
+  summary: string,
+  startISO: string,
+  endISO: string,
+  location?: string,
+): Promise<{ uid: string; url: string }> {
+  const settings = getAppleSettings()
+  if (!settings) throw new Error("Apple Calendar is not configured. Add Apple ID + app password in Settings.")
+
+  const calendars = await discoverCalendars(settings)
+  const calendar = calendars[0]
+  if (!calendar) throw new Error("CalDAV: no writable calendar collection found.")
+
+  const uid = `${crypto.randomUUID()}@jarvis`
+  const dtstamp = toIcsUtc(new Date().toISOString())
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Jarvis//EN",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART:${toIcsUtc(startISO)}`,
+    `DTEND:${toIcsUtc(endISO)}`,
+    `SUMMARY:${escapeIcsText(summary)}`,
+    ...(location ? [`LOCATION:${escapeIcsText(location)}`] : []),
+    "END:VEVENT",
+    "END:VCALENDAR",
+    "",
+  ].join("\r\n")
+
+  const eventUrl = new URL(`${uid}.ics`, new URL(calendar, ICLOUD_CALDAV).toString().replace(/\/?$/, "/")).toString()
+
+  const res = await fetch(eventUrl, {
+    method: "PUT",
+    headers: {
+      Authorization: authHeader(settings),
+      "Content-Type": "text/calendar; charset=utf-8",
+      "If-None-Match": "*",
+    },
+    body: ics,
+    signal: AbortSignal.timeout(20_000),
+  })
+  if (!res.ok) {
+    throw new Error(`CalDAV PUT ${eventUrl} failed: ${res.status} ${await res.text()}`)
+  }
+  return { uid, url: eventUrl }
+}
+
 export async function checkApple(): Promise<boolean> {
   const settings = getAppleSettings()
   if (!settings) return false
@@ -234,5 +297,18 @@ export const appleTools = {
       days: z.number().int().min(1).max(30).optional().describe("How many days ahead (default 7)."),
     }),
     execute: async ({ days }) => ({ events: await getAppleEvents(days ?? 7) }),
+  }),
+  createAppleCalendarEvent: tool({
+    description: "Create a new event on the user's Apple/iCloud Calendar (first available calendar collection).",
+    inputSchema: z.object({
+      summary: z.string().describe("Event title."),
+      startISO: z.string().describe("Start time as an ISO 8601 datetime."),
+      endISO: z.string().describe("End time as an ISO 8601 datetime."),
+      location: z.string().optional(),
+    }),
+    execute: async ({ summary, startISO, endISO, location }) => {
+      const result = await createAppleEvent(summary, startISO, endISO, location)
+      return { created: true, ...result }
+    },
   }),
 }
