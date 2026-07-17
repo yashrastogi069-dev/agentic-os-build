@@ -100,6 +100,39 @@ started scheduler, appeared in the queue AND the feed, and acked cleanly;
   via the agent's setPreference tool today, the UI is convenience), Chunk G
   (formal verification matrix + Fable taste pass on the new surfaces).
 
+### Phase 5 progress log (updated as chunks land, 2026-07-17)
+
+- **Chunk 5A-1/5A-2 (registry skeleton + agent.ts wiring)**: SHIPPED
+  2026-07-17, commit `728d655`. Sonnet executor, Fable-reviewed (SHIP
+  AS-IS, independently re-ran tests/typecheck). `lib/connectors/registry.ts`
+  new; `lib/agent.ts` consumes `connectorTools` + `connectorPromptLines()`.
+- **Chunk 5A-3/5A-4 (feed + health + status-bar onto registry)**: SHIPPED
+  2026-07-17, commit `241c848`. Sonnet executor (switched from an initial
+  Opus dispatch per Yash's "opus for important ones, sonnet for this one"
+  before any files were written — no wasted work). No Fable review this
+  chunk per Yash's explicit "don't do the review" instruction; committed
+  on the executor's own self-reported gates (typecheck/build/test/live
+  probes all passed).
+- **Chunk 5B (OAuth extraction + PKCE + CSRF fix + rotation fix)**: IN
+  PROGRESS 2026-07-17, Opus executor (agent id `a7a50a0692ad2db2d` —
+  intentionally Opus, this is the security-sensitive chunk touching
+  Yash's real Google OAuth credentials). Hit TWO session-limit
+  interruptions (first reset 6pm Asia/Calcutta window, second reset
+  11:40pm) — both times resumed the SAME agent via SendMessage after
+  confirming via `git status` what was already written on disk, never
+  restarted from scratch. As of the second resume: `lib/connectors/
+  oauth.ts` exists (new generic OAuth module: buildAuthUrl/
+  handleOAuthCallback/getAccessToken/disconnect/isConnected, state-based
+  CSRF protection, PKCE-ready, refresh-token rotation), `google.ts`
+  already migrated onto it (`googleOAuth: OAuthDescriptor` const defined).
+  Still to confirm before this chunk can commit: old google.ts OAuth
+  functions fully removed (not left dangling), `/api/google/auth` +
+  `/api/google/callback` routes flipped onto the module with real state
+  validation, new `tests/oauth.test.ts`, full gate pass. **Not yet
+  committed.** Once this lands and gates pass, the SCOPED Phase 5
+  refactor (registry + OAuth, Canva excluded) is done — Yash's explicit
+  instruction is to stop there, no Phase 7 / Canva without his go-ahead.
+
 ### Connector registry decision (Fable medium-effort review, 2026-07-17;
 ### scope trimmed by Yash 2026-07-17)
 
