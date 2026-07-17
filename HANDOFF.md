@@ -237,7 +237,15 @@ push, then move straight to Phase 5.
   depth: a proper `{id, probe(), sync(), tools}` registry, OAuth CSRF fix
   (missing `state` param), a new local-system connector (filesystem watch,
   no external keys), deeper Obsidian (daily-note append, auto-index).
-- **Phase 6 (flagship)** — Voice + intelligence organs: IN PROGRESS (Chunks A/B/D shipped, C/E/F/G remaining). See `JARVIS_BUILD_STATE.md` Phase 6 section for detail. Target latency p50 ≤1.8s; full spec `tasks/MASTER_PLAN_V2.md` §5.
+- **Phase 6 (flagship)** — Voice + intelligence organs: **CLOSED 2026-07-17**.
+  Chunks A-E + H (wake-word) + I (connector write-capability) all shipped
+  and live-verified; two brain-breaking bugs (system-message crash, voice
+  flooding chat) found via Yash's live testing and fixed same-day. Chunks F
+  (latency instrumentation, tone-prefs UI) and G (formal verification
+  matrix, Fable taste pass) explicitly deferred to a polish backlog, not
+  blocking. Full detail: `JARVIS_BUILD_STATE.md` Phase 6 section. Target
+  latency p50 ≤1.8s (not yet instrumented); full spec
+  `tasks/MASTER_PLAN_V2.md` §5.
 - **Phase 7 (flagship)** — Adopt the already-built WhisperFlow clone
   (`Desktop/Whisper clone`) into `tools/dictate`, wire `app/api/system/*`
   with a system token, F9 ask-anywhere, proactive triggers + guardrails +

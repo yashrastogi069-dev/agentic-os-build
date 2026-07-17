@@ -5,13 +5,17 @@ before starting any new work on this project.
 
 ## Current Phase (updated 2026-07-17, live)
 
-**Phase 0, 1, 2, 3 (all chunks) COMPLETE. Phase 4 SHIPPED. Phase 6 CORE
-COMPLETE + LIVE-VERIFIED 2026-07-17** (Chunks A/B/C/D/E shipped, plus new
-H/I; only polish chunks F/G remain). At the HOLD POINT: awaiting Yash's
-visual review before Phase 7. Dev server left running on :3100 for that
-review. After approval the next phase is the connector registry + Canva
-extensibility (Fable medium-effort design recorded in this session — see
-"Connector registry decision" below), then Phase 7.
+**Phase 0, 1, 2, 3 (all chunks) COMPLETE. Phase 4 SHIPPED. Phase 6 CLOSED
+2026-07-17** — Yash tested live on his own :3000 dev server and confirmed
+voice works end-to-end (talk to Jarvis, it replies, hands-free via
+hotkey). His own words: "its working now but needs improvement... complete
+this phase first." Chunks A-E + H + I shipped and live-verified this
+session; chunks F (latency instrumentation + tone-prefs Settings UI) and G
+(formal verification matrix + Fable taste pass) are explicitly DEFERRED,
+not abandoned — see "Phase 6 polish backlog" below. They roll into a
+future polish pass, not blocking further phases. Next up: the connector
+registry + Canva slice (Fable medium-effort design recorded below under
+"Connector registry decision"), then Phase 7.
 
 ### Phase 6 — Voice mode 1 + assistant intelligence core (CORE DONE 2026-07-17)
 
@@ -60,11 +64,40 @@ started scheduler, appeared in the queue AND the feed, and acked cleanly;
 - **Chunk A — Windows voice foundation + benchmark spike** and **Chunk B —
   server voice infra**: SHIPPED (see below, unchanged).
 
-- **Remaining (polish, not blocking the hold-point review)**: Chunk F
-  (latency instrumentation to hit p50<=1.8s + a tone-prefs Settings UI — the
-  prefs already work + persist via the agent's setPreference tool today, the
-  UI is convenience), Chunk G (formal verification matrix + Fable taste pass
-  on the new surfaces).
+- **Brain-dead bug found + fixed live (2026-07-17)**: after the chunks above
+  shipped, Yash's live test on his own :3000 dev server hit "An error
+  occurred, Jarvis can't talk back" on every turn. Root cause: turn context
+  was injected as a `role:"system"` UIMessage; the `ai` package's agent
+  rejects system messages in `prompt`/`messages` at runtime
+  (`AI_InvalidPromptError`) even though `UIMessage`'s type allows the role —
+  took down every provider in the chain identically. Fixed in commit
+  `a61bc16`: context now rides `streamOsAgentResponse(messages, {
+  extraContext, onSessionPersist })` instead. Verified live with curl
+  against Yash's own server: the same request that 500'd now streams a real
+  Gemini reply.
+- **Voice-flooding + chat-echo bug found + fixed live (2026-07-17)**:
+  always-on wake-word listening was transcribing all room noise (198
+  transcribe calls in one session, latency climbing to 14s) and the
+  follow-up window auto-reopened the mic so Jarvis's own TTS got
+  re-transcribed back into the chat as fake user turns. Fixed in commit
+  `6f18548`: wake-word listening now defaults OFF (hotkey/reactor-click
+  activation only, per Yash's explicit instruction), and voice is strictly
+  turn-based (`TtsQueue.onPlaybackStateChange` calls `stopEverything()`
+  when speech ends, no auto-reopen). Voice-originated user turns are tagged
+  `metadata:{voice:true}` and filtered out of the chat render
+  (`components/chat-panel.tsx`) — spoken words no longer echo into the
+  transcript, though the turn is still sent to the brain and persisted.
+- **PHASE 6 CLOSED 2026-07-17**: Yash tested live and confirmed "its
+  working now" — talk to Jarvis via the Right-Alt hotkey, it transcribes,
+  replies through the brain chain, speaks back, all without flooding the
+  chat. His own assessment: "needs a lot of improvement" — that improvement
+  work is captured, not lost, in the "Phase 6 polish backlog" task (see
+  session task list / re-derivable from this file's "Chunk F/G" description
+  above) and is explicitly NOT blocking the next phase. **Remaining
+  (deferred, not blocking)**: Chunk F (latency instrumentation to hit
+  p50<=1.8s + a tone-prefs Settings UI — the prefs already work + persist
+  via the agent's setPreference tool today, the UI is convenience), Chunk G
+  (formal verification matrix + Fable taste pass on the new surfaces).
 
 ### Connector registry decision (Fable medium-effort review, 2026-07-17)
 
