@@ -61,26 +61,25 @@ export async function POST(request: Request) {
     }
   }
 
-  let contextMessages = messages
+  // Turn context rides the agent's INSTRUCTIONS (extraContext), NOT a
+  // system-role message: the ai package's agent rejects system messages
+  // inside prompt/messages at runtime (AI_InvalidPromptError) even though
+  // UIMessage's type allows the role — this took the whole brain chain down
+  // once (every provider failed identically).
+  let extraContext: string | undefined
   try {
-    const context = await buildTurnContext({
-      latestUserText: userText,
-      sessionSummary: getSessionSummary(sessionId),
-    })
-    if (context) {
-      const systemMessage: UIMessage = {
-        id: `ctx-${sessionId}-${Date.now()}`,
-        role: "system",
-        parts: [{ type: "text", text: context }],
-      }
-      contextMessages = [systemMessage, ...messages]
-    }
+    extraContext =
+      (await buildTurnContext({
+        latestUserText: userText,
+        sessionSummary: getSessionSummary(sessionId),
+      })) ?? undefined
   } catch (error) {
     console.error("[chat] failed to build turn context (continuing without it):", error)
   }
 
   try {
-    const response = await streamOsAgentResponse(contextMessages, {
+    const response = await streamOsAgentResponse(messages, {
+      extraContext,
       onSessionPersist: ({ text, brain, uiParts }) => {
         try {
           appendMessage(sessionId, "assistant", text, { uiParts, brain: brain ?? undefined })

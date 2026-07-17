@@ -55,7 +55,15 @@ export function ChatPanel({
             {'> try: "what do you know about me?"'}
           </p>
         )}
-        {messages.map((message) => (
+        {messages
+          // Voice-originated user turns are spoken, not typed — Yash doesn't
+          // want his transcribed speech echoed into the chat. The turn still
+          // goes to the brain and is persisted; only the bubble is hidden.
+          .filter(
+            (message) =>
+              !(message.role === 'user' && (message.metadata as { voice?: boolean } | undefined)?.voice),
+          )
+          .map((message) => (
           <div
             key={message.id}
             className={`max-w-[92%] rounded-md px-3 py-2 text-sm leading-relaxed ${
@@ -155,7 +163,7 @@ export function ChatPanel({
         />
         <VoiceController
           onStateChange={onStateChange}
-          onSendMessage={(text) => sendMessage({ text })}
+          onSendMessage={(text) => sendMessage({ text, metadata: { voice: true } })}
           isAssistantStreaming={busy}
           latestAssistantText={latestAssistantText}
         />
