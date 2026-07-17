@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
 import { WorkletRecorder } from '@/lib/voice/recorder'
 import { EnergyVad } from '@/lib/voice/vad'
-import { matchWakePhrase, getWakeListeningEnabled, setWakeListeningEnabled } from '@/lib/wake-words'
+import { matchWakePhrase, type WakeWordEntry } from '@/lib/wake-words-match'
 
 /**
  * Always-on background wake-word listener — mounted once at the app shell
@@ -40,8 +40,14 @@ interface WakeWordStoreState {
 export const useWakeWordStore = create<WakeWordStoreState>((set) => ({
   enabled: true,
   setEnabled: (enabled) => {
-    setWakeListeningEnabled(enabled)
     set({ enabled })
+    // Persist through the server route — this module is client-side and
+    // cannot touch the DB directly (lib/wake-words is server-only).
+    void fetch('/api/wake-words', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set-listening', enabled }),
+    }).catch(() => undefined)
   },
 }))
 
@@ -58,10 +64,25 @@ export function WakeWordListener() {
   const speechStartAtRef = useRef<number | null>(null)
   const processingRef = useRef(false)
   const stoppedByUserRef = useRef(false)
+  const entriesRef = useRef<WakeWordEntry[]>([])
 
-  // Load persisted enabled state once on mount.
+  // Load the registered wake phrases + persisted enabled state once on mount,
+  // via the server route (the registry lives in the DB; matching runs here).
   useEffect(() => {
-    useWakeWordStore.setState({ enabled: getWakeListeningEnabled() })
+    let cancelled = false
+    void fetch('/api/wake-words')
+      .then((r) => r.json())
+      .then((data: { entries?: WakeWordEntry[]; listeningEnabled?: boolean }) => {
+        if (cancelled) return
+        if (Array.isArray(data.entries)) entriesRef.current = data.entries
+        if (typeof data.listeningEnabled === 'boolean') {
+          useWakeWordStore.setState({ enabled: data.listeningEnabled })
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -134,8 +155,8 @@ export function WakeWordListener() {
             ? 'wake-word unavailable: microphone access denied'
             : 'wake-word unavailable: microphone error',
         )
-        useWakeWordStore.setState({ enabled: false })
-        setWakeListeningEnabled(false)
+        // Disable + persist through the store's server-routed setter.
+        useWakeWordStore.getState().setEnabled(false)
       }
     }
 
@@ -161,7 +182,7 @@ export function WakeWordListener() {
         const json = (await res.json()) as { text?: string; error?: string }
         if (!res.ok || !json.text) return
 
-        const match = matchWakePhrase(json.text)
+        const match = matchWakePhrase(json.text, entriesRef.current)
         if (!match) return
 
         if (match.action === 'activate-voice') {
