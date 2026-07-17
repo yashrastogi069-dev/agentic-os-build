@@ -4,9 +4,7 @@ import { useRef, useState, useEffect } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import type { CoreState } from '@/lib/theme-engine'
-import { WavRecorder } from '@/lib/voice/recorder'
-
-type VoiceState = 'off' | 'recording' | 'transcribing' | 'speaking'
+import { VoiceController } from '@/components/voice/voice-controller'
 
 export function ChatPanel({
   onStateChange,
@@ -14,11 +12,6 @@ export function ChatPanel({
   onStateChange?: (state: CoreState) => void
 }) {
   const [input, setInput] = useState('')
-  const [voiceState, setVoiceState] = useState<VoiceState>('off')
-  const [voiceError, setVoiceError] = useState('')
-  const recorderRef = useRef<WavRecorder | null>(null)
-  const voiceReplyPending = useRef(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const { messages, sendMessage, status, error } = useChat({
@@ -27,118 +20,13 @@ export function ChatPanel({
 
   const busy = status === 'submitted' || status === 'streaming'
 
-  useEffect(() => {
-    onStateChange?.(
-      voiceState === 'recording'
-        ? 'listening'
-        : voiceState === 'speaking'
-          ? 'speaking'
-          : busy || voiceState === 'transcribing'
-            ? 'thinking'
-            : 'idle',
-    )
-  }, [busy, voiceState, onStateChange])
-
-  // Voice loop tail: when a voice-initiated turn finishes, speak the reply via Piper.
-  useEffect(() => {
-    if (status !== 'ready' || !voiceReplyPending.current) return
-    const lastMessage = messages[messages.length - 1]
-    if (!lastMessage || lastMessage.role !== 'assistant') return
-    voiceReplyPending.current = false
-
-    const text = lastMessage.parts
-      .filter((part) => part.type === 'text')
-      .map((part) => part.text)
-      .join(' ')
-      .trim()
-    if (!text) return
-
-    let cancelled = false
-    setVoiceState('speaking')
-    ;(async () => {
-      try {
-        const res = await fetch('/api/voice/speak', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: text.slice(0, 1200) }),
-        })
-        if (!res.ok) {
-          const json = (await res.json()) as { error?: string }
-          throw new Error(json.error ?? 'speech failed')
-        }
-        const url = URL.createObjectURL(await res.blob())
-        if (cancelled) return
-        const audio = new Audio(url)
-        audioRef.current = audio
-        audio.onended = () => {
-          URL.revokeObjectURL(url)
-          setVoiceState('off')
-        }
-        await audio.play()
-      } catch (err) {
-        setVoiceError(err instanceof Error ? err.message : 'speech failed')
-        setVoiceState('off')
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [status, messages])
-
-  async function toggleMic() {
-    setVoiceError('')
-    if (voiceState === 'speaking') {
-      audioRef.current?.pause()
-      setVoiceState('off')
-      return
-    }
-    if (voiceState === 'recording') {
-      setVoiceState('transcribing')
-      try {
-        const wav = await recorderRef.current!.stop()
-        recorderRef.current = null
-        const res = await fetch('/api/voice/transcribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'audio/wav' },
-          body: wav,
-        })
-        const json = (await res.json()) as { text?: string; error?: string }
-        if (!res.ok || !json.text) {
-          throw new Error(json.error ?? 'nothing transcribed')
-        }
-        voiceReplyPending.current = true
-        sendMessage({ text: json.text })
-        setVoiceState('off')
-      } catch (err) {
-        setVoiceError(err instanceof Error ? err.message : 'transcription failed')
-        setVoiceState('off')
-      }
-      return
-    }
-    try {
-      const recorder = new WavRecorder()
-      await recorder.start()
-      recorderRef.current = recorder
-      setVoiceState('recording')
-    } catch {
-      setVoiceError('microphone access denied')
-    }
-  }
-
-  // Arc Reactor bridge (§2.2): clicking the reactor (or Alt+J) dispatches a
-  // `jarvis:toggle-mic` window event. We keep the latest `toggleMic` in a ref
-  // so the listener registers exactly once yet never runs a stale closure
-  // (toggleMic is re-created each render as it closes over voiceState). This
-  // is the whole voice-flow touch Chunk C needs — Phase 6 replaces the bus.
-  const toggleMicRef = useRef(toggleMic)
-  toggleMicRef.current = toggleMic
-  useEffect(() => {
-    function handleToggleMic() {
-      void toggleMicRef.current()
-    }
-    window.addEventListener('jarvis:toggle-mic', handleToggleMic)
-    return () => window.removeEventListener('jarvis:toggle-mic', handleToggleMic)
-  }, [])
+  const lastAssistantMessage = [...messages].reverse().find((m) => m.role === 'assistant')
+  const latestAssistantText = lastAssistantMessage
+    ? lastAssistantMessage.parts
+        .filter((part) => part.type === 'text')
+        .map((part) => part.text)
+        .join(' ')
+    : ''
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
@@ -239,7 +127,7 @@ export function ChatPanel({
       </div>
 
       <form
-        className="flex items-center gap-2 rounded-lg bg-[oklch(0.1_0.02_250_/_55%)] p-3 shadow-[inset_0_0_0_1px_oklch(1_0_0_/_7%)] transition-shadow focus-within:shadow-[inset_0_0_0_1px_oklch(from_var(--accent-live)_l_c_h_/_45%),0_0_16px_oklch(from_var(--accent-live)_l_c_h_/_12%)] m-3 mt-2"
+        className="relative flex items-center gap-2 rounded-lg bg-[oklch(0.1_0.02_250_/_55%)] p-3 shadow-[inset_0_0_0_1px_oklch(1_0_0_/_7%)] transition-shadow focus-within:shadow-[inset_0_0_0_1px_oklch(from_var(--accent-live)_l_c_h_/_45%),0_0_16px_oklch(from_var(--accent-live)_l_c_h_/_12%)] m-3 mt-2"
         onSubmit={(e) => {
           e.preventDefault()
           submit()
@@ -265,33 +153,12 @@ export function ChatPanel({
           aria-label="Message the agent"
           className="flex-1 bg-transparent font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground"
         />
-        <button
-          type="button"
-          onClick={toggleMic}
-          disabled={busy || voiceState === 'transcribing'}
-          aria-label={
-            voiceState === 'recording'
-              ? 'Stop recording and send'
-              : voiceState === 'speaking'
-                ? 'Stop speaking'
-                : 'Start voice input'
-          }
-          className={`rounded-sm border px-3 py-1 font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-40 ${
-            voiceState === 'recording'
-              ? 'animate-pulse border-destructive/60 bg-destructive/15 text-destructive'
-              : voiceState === 'speaking'
-                ? 'border-accent/60 bg-accent/15 text-accent'
-                : 'border-[oklch(from_var(--accent-live)_l_c_h_/_30%)] text-primary hover:border-[oklch(from_var(--accent-live)_l_c_h_/_55%)]'
-          }`}
-        >
-          {voiceState === 'recording'
-            ? 'stop'
-            : voiceState === 'transcribing'
-              ? '…'
-              : voiceState === 'speaking'
-                ? 'mute'
-                : 'mic'}
-        </button>
+        <VoiceController
+          onStateChange={onStateChange}
+          onSendMessage={(text) => sendMessage({ text })}
+          isAssistantStreaming={busy}
+          latestAssistantText={latestAssistantText}
+        />
         <button
           type="submit"
           disabled={busy || input.trim().length === 0}
@@ -300,12 +167,6 @@ export function ChatPanel({
           send
         </button>
       </form>
-      {voiceError && (
-        <p className="px-3 pb-2 font-mono text-[10px] text-destructive">
-          {'[voice] '}
-          {voiceError}
-        </p>
-      )}
     </div>
   )
 }
