@@ -13,9 +13,10 @@ this phase first." Chunks A-E + H + I shipped and live-verified this
 session; chunks F (latency instrumentation + tone-prefs Settings UI) and G
 (formal verification matrix + Fable taste pass) are explicitly DEFERRED,
 not abandoned — see "Phase 6 polish backlog" below. They roll into a
-future polish pass, not blocking further phases. Next up: the connector
-registry + Canva slice (Fable medium-effort design recorded below under
-"Connector registry decision"), then Phase 7.
+future polish pass, not blocking further phases. **Now starting Phase 5:
+connector registry refactor (Canva explicitly excluded — deferred to the
+end, per Yash 2026-07-17)** — see "Connector registry decision" below —
+then Phase 7.
 
 ### Phase 6 — Voice mode 1 + assistant intelligence core (CORE DONE 2026-07-17)
 
@@ -99,18 +100,24 @@ started scheduler, appeared in the queue AND the feed, and acked cleanly;
   via the agent's setPreference tool today, the UI is convenience), Chunk G
   (formal verification matrix + Fable taste pass on the new surfaces).
 
-### Connector registry decision (Fable medium-effort review, 2026-07-17)
+### Connector registry decision (Fable medium-effort review, 2026-07-17;
+### scope trimmed by Yash 2026-07-17)
 
 For "add tools like Canva in future": build a minimal slice of Phase 5 next
 (NOT the full phase). In scope: `lib/connectors/registry.ts`
 (`{id,label,promptHint,probe,sync?,tools,auth?}`) that health/feed/status/
 agent-tools iterate; `lib/connectors/oauth.ts` extracted from google.ts but
-built for refresh-token ROTATION + PKCE (Google needs neither, Canva needs
-both) with the CSRF `state` fix folded in; Canva as connector #6 to prove
-the pattern. Two gaps Fable caught: `lib/agent.ts` INSTRUCTIONS hardcodes
-per-connector capability prose (needs a `promptHint` per registry entry or
-new tools stay invisible to the model), and Google's OAuth can't be copied
-verbatim. Deferred: MCP key masking, local-fs connector, Obsidian depth,
+built for refresh-token ROTATION + PKCE (Google needs neither, a future
+OAuth-PKCE connector will) with the CSRF `state` fix folded in; migrate the
+existing 5 connectors (GitHub, Obsidian, Telegram, Google, Apple) onto the
+registry to prove the pattern. Two gaps Fable caught: `lib/agent.ts`
+INSTRUCTIONS hardcodes per-connector capability prose (needs a `promptHint`
+per registry entry or new tools stay invisible to the model), and Google's
+OAuth can't be copied verbatim for a future PKCE connector. **Canva is
+explicitly OUT of this phase** (Yash: "leave the canva slice out of phase
+5 we will do that later in the end") — add it as a NEW connector on top of
+the finished registry once the registry itself ships, not as this phase's
+proof case. Deferred: MCP key masking, local-fs connector, Obsidian depth,
 live matrix. "Memory not just read-only" = write-capability (done), NOT
 auto-ingestion.
 
