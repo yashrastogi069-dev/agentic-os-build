@@ -134,6 +134,27 @@ function encodePath(notePath: string): string {
 }
 
 /**
+ * Live reachability probe — same logic as the inline `probeObsidian` in
+ * app/api/health/route.ts (that route keeps its own copy for now; this
+ * export exists so lib/connectors/registry.ts can reuse the identical check
+ * without a network-call-shaped health-route refactor, which is out of
+ * scope for the registry pass).
+ */
+export async function checkObsidian(): Promise<{ configured: boolean; ok: boolean }> {
+  const settings = getObsidianSettings()
+  if (!settings) return { configured: false, ok: false }
+  try {
+    const res = await fetch(`${settings.baseUrl}/`, {
+      headers: { Authorization: `Bearer ${settings.apiKey}` },
+      signal: AbortSignal.timeout(1500),
+    })
+    return { configured: true, ok: res.ok }
+  } catch {
+    return { configured: true, ok: false }
+  }
+}
+
+/**
  * Feed sync — records a daily vault snapshot event (file count + reachability).
  * The Local REST API has no modified-since endpoint, so per-note change events
  * aren't available; the snapshot keeps the feed honest about vault status.

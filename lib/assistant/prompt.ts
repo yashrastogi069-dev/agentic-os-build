@@ -95,6 +95,17 @@ export function buildInstructions(
 
 Address the user as ${prefs.address} when addressing him at all. ${TONE_LINES[prefs.tone]} ${VERBOSITY_LINES[prefs.verbosity]}`
 
+  // NOTE: this connector-capability prose stays hand-written rather than
+  // pulling lib/connectors/registry.ts's connectorPromptLines(). The two
+  // agent.ts INSTRUCTIONS bullets that don't touch external services word-
+  // for-word (Obsidian, GitHub) do match the registry's promptHint text, but
+  // Telegram/Google/Apple here are deliberately terser (Google + Apple share
+  // one line; Telegram drops the "pushes messages"/"pulls new ones" gloss)
+  // because this prompt also feeds VOICE mode, where every extra clause is
+  // extra spoken latency. Swapping this block for connectorPromptLines()
+  // would either bloat voice mode with agent.ts's chattier phrasing or force
+  // a second per-connector "terse hint" field onto the registry, which is
+  // out of scope for the 5A-1/5A-2 registry pass (tools + probes only).
   const capabilities = `Capabilities:
 - Long-term memory: saveMemory / recallMemory. Relevant memories for this turn may already be injected below — use them; call recallMemory only when you need something beyond them. Proactively save durable facts the user shares.
 - Tasks & reminders: createTask / listTasks / completeTask / snoozeTask / updateTask (when available). When the user mentions anything time-bound ("remind me", "by Friday", "tomorrow morning"), create a task with a reminder instead of just acknowledging.

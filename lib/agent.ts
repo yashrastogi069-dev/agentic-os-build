@@ -21,11 +21,7 @@ import {
   type ResolvedProvider,
 } from "@/lib/providers"
 import { researchTools } from "@/lib/research"
-import { obsidianTools } from "@/lib/connectors/obsidian"
-import { githubTools } from "@/lib/connectors/github"
-import { telegramTools } from "@/lib/connectors/telegram"
-import { googleTools } from "@/lib/connectors/google"
-import { appleTools } from "@/lib/connectors/apple"
+import { connectorTools, connectorPromptLines } from "@/lib/connectors/registry"
 import { getRecentEvents } from "@/lib/events"
 import { createTask, listTasks, completeTask, snoozeTask, updateTask } from "@/lib/tasks"
 import { setAssistantPreference } from "@/lib/assistant/prompt"
@@ -309,17 +305,18 @@ const preferenceTools = {
   }),
 }
 
-const INSTRUCTIONS = `You are Agentic OS — a personal AI operating system running locally on the user's machine.
+/**
+ * Exported (not just module-local) so tests/agent.instructions.test.ts can
+ * snapshot it directly and catch any drift in the connector registry's
+ * promptHint strings without needing to build a full agent/model.
+ */
+export const INSTRUCTIONS = `You are Agentic OS — a personal AI operating system running locally on the user's machine.
 
 Capabilities:
 - Long-term memory: saveMemory / recallMemory. Proactively recall context before answering personal questions; proactively save durable facts the user shares.
 - Tasks & reminders: createTask / listTasks / completeTask / snoozeTask / updateTask. When the user mentions anything time-bound ("remind me", "by Friday", "tomorrow morning"), create a task instead of just acknowledging.
 - Preferences: setPreference persists tone/verbosity/how to address the user across sessions — use it when the user says things like "be more casual" instead of just complying for one turn.
-- Obsidian vault: search, read, append, and create notes (when the connector is configured).
-- GitHub: notifications, PRs, issues, recent commits (when GITHUB_TOKEN is set).
-- Telegram: sendTelegram pushes messages to the user's phone; getTelegramMessages pulls new ones (when a bot token is configured).
-- Google: getCalendarEvents / getRecentEmails (when the user connects Google in Settings).
-- Apple Calendar: getAppleCalendarEvents via iCloud (when Apple ID + app password are configured).
+${connectorPromptLines()}
 - Updates feed: merged events from all connectors; use it for briefings.
 - Web research: webSearch (live web) + fetchPage (read a URL as markdown). Use these for latest versions, current events, and any fact you are unsure about instead of guessing.
 - Skill Factory: saveAsSkill / listSkills / runSkill. When the user mentions doing something repeatedly, offer to save it as a skill.
@@ -339,11 +336,7 @@ const allTools = {
   ...wakeWordTools,
   ...preferenceTools,
   ...researchTools,
-  ...obsidianTools,
-  ...githubTools,
-  ...telegramTools,
-  ...googleTools,
-  ...appleTools,
+  ...connectorTools,
 }
 
 /** Build the OS agent on a specific model (used by the failover loop). `extraInstructions`,
