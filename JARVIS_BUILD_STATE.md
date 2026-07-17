@@ -92,13 +92,39 @@ started scheduler, appeared in the queue AND the feed, and acked cleanly;
   working now" — talk to Jarvis via the Right-Alt hotkey, it transcribes,
   replies through the brain chain, speaks back, all without flooding the
   chat. His own assessment: "needs a lot of improvement" — that improvement
-  work is captured, not lost, in the "Phase 6 polish backlog" task (see
-  session task list / re-derivable from this file's "Chunk F/G" description
-  above) and is explicitly NOT blocking the next phase. **Remaining
-  (deferred, not blocking)**: Chunk F (latency instrumentation to hit
-  p50<=1.8s + a tone-prefs Settings UI — the prefs already work + persist
-  via the agent's setPreference tool today, the UI is convenience), Chunk G
-  (formal verification matrix + Fable taste pass on the new surfaces).
+  work is captured, not lost, in the "Phase 6 polish backlog" task and is
+  explicitly NOT blocking the next phase.
+
+### Phase 6 polish backlog progress (updated as chunks land, 2026-07-18)
+
+- **Chunk F (latency instrumentation + tone-prefs UI + 2 design fixes)**:
+  SHIPPED 2026-07-18, commit `cb4b3b1`. Sonnet executor + a parallel Fable
+  taste review of the four Phase 6 surfaces that hadn't had one yet (voice
+  controller, wake-word dot, tasks panel, notification toasts) — Fable's
+  review agent initially over-engineered its own setup (isolated into a
+  git worktree + fresh pnpm install just for a read-only screenshot pass);
+  Yash caught it live ("dont over do these") and it was redirected to a
+  code-only review instead, which delivered two real, actionable findings:
+  the voice "listening" mic state was styled destructive/red (read as an
+  error during normal use, fixed to primary/cyan) and notification toasts
+  were using a glow utility the design spec reserves for exactly two other
+  surfaces (removed). Both folded into the same executor pass. New:
+  per-stage voice latency tracking (`voice_latency` table, SCHEMA_VERSION
+  4->5, non-blocking fire-and-forget POST from the client, p50/p90 surfaced
+  in Settings), a tone/verbosity/address preferences UI wired to the same
+  `setAssistantPreference()` the chat-based `setPreference` tool already
+  used (single source of truth, Fable-verified no divergent path). Fable
+  review checkpoint (independently re-read every changed file): SHIP
+  AS-IS. Two minor open items carried forward, not blockers: `speaking`/
+  `thinking` voice-state colors still don't match PHASE3_DESIGN.md's hue
+  table, and `animate-pulse` lacks a reduced-motion fallback in two places
+  (voice-controller.tsx, wake-word-listener.tsx).
+- **Remaining in the polish backlog**: formal verification pass (intent
+  test set, refresh-restores-conversation, tone-persists-across-restart —
+  the mechanism is proven, a dedicated pass hasn't run), RAM measurement
+  with the dictation app also running. Not blocking Phase 7, per Yash's
+  "lets do the left of phase 6 and then phase 7" — proceeding into Phase 7
+  now, will fold these remaining items in alongside it.
 
 ### Phase 5 progress log (updated as chunks land, 2026-07-17)
 
