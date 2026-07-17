@@ -12,6 +12,7 @@ import { SettingsPanel } from '@/components/settings-panel'
 import { EdgeRail, RAIL_ITEMS, type RightTab } from '@/components/hud/edge-rail'
 import { PanelOverlay } from '@/components/hud/panel-overlay'
 import { CoreReadout } from '@/components/hud/core-readout'
+import { WakeWordListener } from '@/components/voice/wake-word-listener'
 import { useThemeStore } from '@/lib/theme-engine'
 
 const PANEL_LABEL: Record<RightTab, string> = {
@@ -116,39 +117,43 @@ export function HudShell({ isDesktop }: { isDesktop: boolean }) {
 
   if (!isDesktop) {
     return (
-      <div className="pointer-events-none fixed inset-0 z-30 flex flex-col">
-        <div className="hud-scrim-top pointer-events-none absolute inset-x-0 top-0 z-10 h-24" />
-        <div className="pointer-events-auto relative z-20 pt-[env(safe-area-inset-top)]">
-          <StatusBar onOpenSettings={() => togglePanel('settings')} />
-        </div>
-        <div className="pointer-events-auto relative z-20 min-h-0 flex-1 pb-16">
-          <ChatPanel
-            onStateChange={(state) => useThemeStore.getState().setCoreState(state)}
+      <>
+        <WakeWordListener />
+        <div className="pointer-events-none fixed inset-0 z-30 flex flex-col">
+          <div className="hud-scrim-top pointer-events-none absolute inset-x-0 top-0 z-10 h-24" />
+          <div className="pointer-events-auto relative z-20 pt-[env(safe-area-inset-top)]">
+            <StatusBar onOpenSettings={() => togglePanel('settings')} />
+          </div>
+          <div className="pointer-events-auto relative z-20 min-h-0 flex-1 pb-16">
+            <ChatPanel
+              onStateChange={(state) => useThemeStore.getState().setCoreState(state)}
+            />
+          </div>
+          <EdgeRail
+            orientation="horizontal"
+            activeTab={openPanel}
+            onSelect={togglePanel}
+            registerButtonRef={registerButtonRef}
+            containerRef={railContainerRef}
           />
+          {openPanel && (
+            <PanelOverlay
+              title={PANEL_LABEL[openPanel]}
+              onClose={closePanel}
+              excludeRef={railContainerRef}
+              variant="fullscreen"
+            >
+              {renderPanel(openPanel)}
+            </PanelOverlay>
+          )}
         </div>
-        <EdgeRail
-          orientation="horizontal"
-          activeTab={openPanel}
-          onSelect={togglePanel}
-          registerButtonRef={registerButtonRef}
-          containerRef={railContainerRef}
-        />
-        {openPanel && (
-          <PanelOverlay
-            title={PANEL_LABEL[openPanel]}
-            onClose={closePanel}
-            excludeRef={railContainerRef}
-            variant="fullscreen"
-          >
-            {renderPanel(openPanel)}
-          </PanelOverlay>
-        )}
-      </div>
+      </>
     )
   }
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30">
+      <WakeWordListener />
       {/* z-50 top-right is reserved for Phase 6's `notification-toasts.tsx`
           (reminder/event toasts, per MASTER_PLAN_V2.md §3 4B and §5.2) — it
           must sit above the status bar (z-20) and the panel overlay (z-40).

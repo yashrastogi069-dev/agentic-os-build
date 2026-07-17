@@ -29,6 +29,7 @@ import { appleTools } from "@/lib/connectors/apple"
 import { getRecentEvents } from "@/lib/events"
 import { createTask, listTasks, completeTask, snoozeTask, updateTask } from "@/lib/tasks"
 import { setAssistantPreference } from "@/lib/assistant/prompt"
+import { addWakeWord, listWakeWords, removeWakeWord } from "@/lib/wake-words"
 
 /**
  * The OS brain now comes from the provider failsafe chain (lib/providers.ts):
@@ -250,6 +251,49 @@ const taskTools = {
   }),
 }
 
+const wakeWordTools = {
+  addWakeWord: tool({
+    description:
+      "Register a new wake word/phrase that activates an action when spoken aloud. Currently only the \"activate-voice\" action is wired to real behavior (it starts a voice conversation turn, same as saying 'Jarvis' or pressing Alt+J). Other action strings are reserved for future features — registering one now is safe and forward-compatible, but nothing will happen when it's spoken until a listener for that action id is built. Use when the user says things like \"add a wake word 'computer' for activating voice\" or \"let me say 'hey assistant' to talk to you\".",
+    inputSchema: z.object({
+      phrase: z.string().describe("The word or short phrase to listen for, e.g. 'computer' or 'hey jarvis'. Stored lowercased/trimmed."),
+      action: z
+        .string()
+        .describe(
+          "The action id to fire when this phrase is heard. Use 'activate-voice' to start a voice conversation turn (the only currently-wired action). Any other string is reserved for a future feature and will not do anything yet.",
+        ),
+    }),
+    execute: async ({ phrase, action }) => {
+      const entry = addWakeWord(phrase, action)
+      return { id: entry.id, phrase: entry.phrase, action: entry.action, enabled: entry.enabled }
+    },
+  }),
+  listWakeWords: tool({
+    description: "List all registered wake words/phrases, their target action, and whether each is enabled.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      return {
+        wakeWords: listWakeWords().map((e) => ({
+          id: e.id,
+          phrase: e.phrase,
+          action: e.action,
+          enabled: e.enabled,
+        })),
+      }
+    },
+  }),
+  removeWakeWord: tool({
+    description: "Delete a registered wake word by id. Use listWakeWords first if you need to find the id.",
+    inputSchema: z.object({
+      id: z.string().describe("The wake word entry id."),
+    }),
+    execute: async ({ id }) => {
+      removeWakeWord(id)
+      return { removed: true, id }
+    },
+  }),
+}
+
 const preferenceTools = {
   setPreference: tool({
     description:
@@ -279,6 +323,7 @@ Capabilities:
 - Updates feed: merged events from all connectors; use it for briefings.
 - Web research: webSearch (live web) + fetchPage (read a URL as markdown). Use these for latest versions, current events, and any fact you are unsure about instead of guessing.
 - Skill Factory: saveAsSkill / listSkills / runSkill. When the user mentions doing something repeatedly, offer to save it as a skill.
+- Wake words: addWakeWord / listWakeWords / removeWakeWord. Use when the user wants to add or manage spoken trigger phrases (e.g. "add a wake word 'computer'"). Only the 'activate-voice' action currently does anything (it starts a voice turn, like saying "Jarvis"); say so if the user asks for a different action.
 
 Behavior:
 - Be concise and direct. This is an OS console, not a chatty assistant.
@@ -291,6 +336,7 @@ const allTools = {
   ...feedTools,
   ...skillTools,
   ...taskTools,
+  ...wakeWordTools,
   ...preferenceTools,
   ...researchTools,
   ...obsidianTools,

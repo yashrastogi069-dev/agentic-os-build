@@ -58,6 +58,15 @@ export function VoiceController({
     onStateChange?.(toCoreState(state))
   }, [state, onStateChange])
 
+  // Tell components/voice/wake-word-listener.tsx when a conversation turn is
+  // active so it can release the mic (avoids two components fighting over
+  // getUserMedia, and avoids "Jarvis" spoken mid-conversation double-triggering).
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('jarvis:conversation-active', { detail: { active: state !== 'idle' } }),
+    )
+  }, [state])
+
   function clearFollowUpTimer() {
     if (followUpTimerRef.current !== null) {
       window.clearTimeout(followUpTimerRef.current)
