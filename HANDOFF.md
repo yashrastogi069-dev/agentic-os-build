@@ -237,11 +237,7 @@ push, then move straight to Phase 5.
   depth: a proper `{id, probe(), sync(), tools}` registry, OAuth CSRF fix
   (missing `state` param), a new local-system connector (filesystem watch,
   no external keys), deeper Obsidian (daily-note append, auto-index).
-- **Phase 6 (flagship)** — Voice + intelligence organs: faster-whisper STT
-  sidecar on :8765 shared with the dictation tool, brain → sentence-chunked
-  TTS with barge-in, `chat_sessions`/`chat_messages`, context injection,
-  tasks + scheduler, prefs. Target latency p50 ≤1.8s. Opus xhigh, no
-  compromise (pin `model:'opus'` explicitly).
+- **Phase 6 (flagship)** — Voice + intelligence organs: IN PROGRESS (Chunks A/B/D shipped, C/E/F/G remaining). See `JARVIS_BUILD_STATE.md` Phase 6 section for detail. Target latency p50 ≤1.8s; full spec `tasks/MASTER_PLAN_V2.md` §5.
 - **Phase 7 (flagship)** — Adopt the already-built WhisperFlow clone
   (`Desktop/Whisper clone`) into `tools/dictate`, wire `app/api/system/*`
   with a system token, F9 ask-anywhere, proactive triggers + guardrails +

@@ -6,9 +6,20 @@ before starting any new work on this project.
 ## Current Phase (updated 2026-07-16, live)
 
 **Phase 0, 1, 2, 3 (all chunks) COMPLETE. Phase 4 (Shell & panels
-redesign) SHIPPED 2026-07-16.** See "Phase 4 — SHIPPED" section below for
-the full writeup. Next up: Phase 5 (connector registry) per
-`tasks/MASTER_PLAN_V2.md` §4.
+redesign) SHIPPED 2026-07-16.** Phase 6 (Voice + intelligence) IN PROGRESS,
+started 2026-07-16 (Chunks A/B/D shipped, C/E/F/G remaining). See sections
+below for detail. Planned sequence: complete Phase 6, hold for Yash approval,
+then Phase 7 (dictation companion + proactive assistance).
+
+### Phase 6 — Voice mode 1 + assistant intelligence core (IN PROGRESS, started 2026-07-16)
+
+Chunks A (Windows voice foundation + benchmark spike) and B (server voice infra) SHIPPED. Chunk D groundwork + full (sessions + context core) SHIPPED. Remaining: Chunks C (client voice loop), E (tasks + reminders + notifications UI), F (latency optimization), G (verification matrix). Full spec: `tasks/MASTER_PLAN_V2.md` §5. Benchmarks: `tasks/PHASE6_BENCH.md` (STT warm RTF 0.14-0.21, Piper daemon 116-335ms/sentence warm).
+
+- **Chunk A — Windows voice foundation + benchmark spike**: SHIPPED, commit 8887669. `tools/stt-server` (faster-whisper sidecar on 127.0.0.1:8765, shares dictation tool's cached model), `scripts/setup-voice.ps1` (Piper 2023.11.14-2 + en_US-lessac-medium voice, pinned/idempotent). See `tasks/PHASE6_BENCH.md` for measured numbers.
+- **Chunk B — server voice infra**: SHIPPED, commit b3d85ef. `lib/voice/stt.ts` (transcribeWav chain: sidecar → guarded auto-start+retry → whisper-cli fallback → honest VoiceUnavailableError), `lib/voice/piper.ts` (persistent daemon, globalThis-guarded singleton, serialized queue, 5min idle-unload, crash recovery), rewritten `app/api/voice/transcribe` + `speak` routes, new `app/api/voice/status` route, `lib/voice/paths.ts` updated for Windows .exe suffixing and sidecar/daemon paths.
+- **Chunk D groundwork + full (sessions + context core)**: SHIPPED, commits b3d85ef (schema/assistant persona) + d83e457 (sessions/tasks/notifications/agent wiring). `lib/db/schema.ts` gained `chat_sessions`, `chat_messages`, `tasks`, `notifications` (SCHEMA_VERSION 4 — shared notification queue per MASTER_PLAN_V2 §1 SS1, dedupe_key unique for Phase 7 compatibility). `lib/assistant/prompt.ts` (persona + tone/verbosity/address preferences persisted in connector_settings, text vs voice response contracts), `lib/assistant/context.ts` (per-turn context: time, session summary, open tasks <48h, top-5 memories, fail-soft). `lib/sessions.ts` (session/message CRUD + rolling summarization via generateText, fail-soft), `lib/tasks.ts` (CRUD + recurrence: daily/weekdays/weekly/monthly, completeTask spins off next occurrence), `lib/db/notifications.ts` (enqueue/list-pending/ack/snooze/mark-delivered). `lib/agent.ts` gained taskTools + preferenceTools (setPreference persists "be more casual" style requests across restarts) wired into allTools; streamOsAgentResponse gained extraContext + onSessionPersist hooks. `app/api/chat/route.ts` now creates/resumes sessions (X-Session-Id header), persists both turns, injects turn context as system message, fires summarization after each turn. New `app/api/sessions(/[id])` routes for session list/resume.
+- **Not yet built**: Chunk C (client voice loop: AudioWorklet recorder, VAD, sentence chunker, TTS queue, voice-controller, reactor wiring, barge-in), Chunk E (reminder scheduler + SSE toasts + tasks panel UI + 6th edge-rail icon — data layer exists but nothing fires or displays yet), Chunk F (latency optimization + tone prefs UI), Chunk G (verification matrix + hold for Yash).
+- **Gates status**: `pnpm typecheck` clean after every commit. `pnpm build` and live dev-server verification NOT YET RUN this session — do that before Phase 6 is called done.
 
 ### Phase 4 — SHIPPED (2026-07-16)
 
