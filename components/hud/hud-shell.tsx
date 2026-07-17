@@ -87,8 +87,9 @@ export function HudShell({ isDesktop }: { isDesktop: boolean }) {
   }, [openPanel])
 
   // Global hotkeys: Ctrl+B collapses/expands the chat dock, Alt+1..5 summons
-  // the corresponding panel (or closes it if already open). Esc is handled
-  // by PanelOverlay itself while a panel is open.
+  // the corresponding panel (or closes it if already open), Right Alt alone
+  // talks to Jarvis. Esc is handled by PanelOverlay itself while a panel is
+  // open.
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === 'b') {
@@ -96,14 +97,17 @@ export function HudShell({ isDesktop }: { isDesktop: boolean }) {
         setChatCollapsed((v) => !v)
         return
       }
+      // Right Alt pressed alone (not as a modifier held with another key) —
+      // talk to Jarvis (§2.2/§6): same event the reactor click dispatches;
+      // voice-controller's listener toggles the mic. Fires on the Alt
+      // keydown itself (event.key === 'Alt'), distinct from Alt+1..5 below
+      // which fires on the digit's keydown with altKey held.
+      if (event.code === 'AltRight' && event.key === 'Alt') {
+        event.preventDefault()
+        window.dispatchEvent(new CustomEvent('jarvis:toggle-mic'))
+        return
+      }
       if (event.altKey && !event.ctrlKey && !event.metaKey) {
-        // Alt+J — talk to Jarvis (§2.2/§6): same event the reactor click
-        // dispatches; chat-panel's listener toggles the mic.
-        if (event.key.toLowerCase() === 'j') {
-          event.preventDefault()
-          window.dispatchEvent(new CustomEvent('jarvis:toggle-mic'))
-          return
-        }
         const index = Number(event.key)
         if (index >= 1 && index <= RAIL_ITEMS.length) {
           event.preventDefault()
