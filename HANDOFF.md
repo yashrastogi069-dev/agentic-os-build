@@ -233,10 +233,16 @@ push, then move straight to Phase 5.
 
 ## 4. What's next after Phase 4 (per `tasks/MASTER_PLAN_V2.md`)
 
-- **Phase 5** — Connector framework refactor + Google/Telegram/local-system
-  depth: a proper `{id, probe(), sync(), tools}` registry, OAuth CSRF fix
-  (missing `state` param), a new local-system connector (filesystem watch,
-  no external keys), deeper Obsidian (daily-note append, auto-index).
+- **Phase 5 (SCOPED SLICE) — CLOSED 2026-07-17.** Built: `lib/connectors/
+  registry.ts` ({id, probe(), sync(), tools, promptHint} for all 5
+  connectors + voice/system), `lib/connectors/oauth.ts` (generic OAuth
+  module, PKCE-ready), the real CSRF fix (missing `state` param — was a
+  genuine live vulnerability, now fixed and live-verified), refresh-token
+  rotation fix. `lib/agent.ts`, health, feed, status-bar all migrated onto
+  the registry. Canva and the local-system/filesystem connector were
+  explicitly deferred by Yash to a later, separate pass — not done here.
+  Deeper Obsidian integration (daily-note append, auto-index) also
+  deferred. Full detail: `JARVIS_BUILD_STATE.md`.
 - **Phase 6 (flagship)** — Voice + intelligence organs: **CLOSED 2026-07-17**.
   Chunks A-E + H (wake-word) + I (connector write-capability) all shipped
   and live-verified; two brain-breaking bugs (system-message crash, voice

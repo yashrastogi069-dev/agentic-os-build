@@ -12,11 +12,11 @@ hotkey). His own words: "its working now but needs improvement... complete
 this phase first." Chunks A-E + H + I shipped and live-verified this
 session; chunks F (latency instrumentation + tone-prefs Settings UI) and G
 (formal verification matrix + Fable taste pass) are explicitly DEFERRED,
-not abandoned — see "Phase 6 polish backlog" below. They roll into a
-future polish pass, not blocking further phases. **Now starting Phase 5:
-connector registry refactor (Canva explicitly excluded — deferred to the
-end, per Yash 2026-07-17)** — see "Connector registry decision" below —
-then Phase 7.
+not abandoned — see "Phase 6 polish backlog" below. **Phase 5 (scoped:
+connector registry + OAuth refactor, Canva excluded) is now ALSO CLOSED,
+2026-07-17** — see "PHASE 5 (SCOPED) COMPLETE" below. Stopped there per
+Yash's explicit instruction; next phase (7, or Canva) awaits his
+go-ahead.
 
 ### Phase 6 — Voice mode 1 + assistant intelligence core (CORE DONE 2026-07-17)
 
@@ -113,25 +113,51 @@ started scheduler, appeared in the queue AND the feed, and acked cleanly;
   chunk per Yash's explicit "don't do the review" instruction; committed
   on the executor's own self-reported gates (typecheck/build/test/live
   probes all passed).
-- **Chunk 5B (OAuth extraction + PKCE + CSRF fix + rotation fix)**: IN
-  PROGRESS 2026-07-17, Opus executor (agent id `a7a50a0692ad2db2d` —
-  intentionally Opus, this is the security-sensitive chunk touching
-  Yash's real Google OAuth credentials). Hit TWO session-limit
-  interruptions (first reset 6pm Asia/Calcutta window, second reset
-  11:40pm) — both times resumed the SAME agent via SendMessage after
-  confirming via `git status` what was already written on disk, never
-  restarted from scratch. As of the second resume: `lib/connectors/
-  oauth.ts` exists (new generic OAuth module: buildAuthUrl/
-  handleOAuthCallback/getAccessToken/disconnect/isConnected, state-based
-  CSRF protection, PKCE-ready, refresh-token rotation), `google.ts`
-  already migrated onto it (`googleOAuth: OAuthDescriptor` const defined).
-  Still to confirm before this chunk can commit: old google.ts OAuth
-  functions fully removed (not left dangling), `/api/google/auth` +
-  `/api/google/callback` routes flipped onto the module with real state
-  validation, new `tests/oauth.test.ts`, full gate pass. **Not yet
-  committed.** Once this lands and gates pass, the SCOPED Phase 5
-  refactor (registry + OAuth, Canva excluded) is done — Yash's explicit
-  instruction is to stop there, no Phase 7 / Canva without his go-ahead.
+- **Chunk 5B (OAuth extraction + PKCE + CSRF fix + rotation fix)**:
+  SHIPPED 2026-07-17, commit `8fb9e14`. Opus executor (agent id
+  `a7a50a0692ad2db2d` — intentionally Opus, security-sensitive chunk
+  touching Yash's real Google OAuth credentials). Survived THREE
+  interruptions before landing (two session-limit hits, one transient
+  500 server error) — every time resumed the SAME agent via SendMessage
+  after confirming via `git status` what was already on disk, never
+  restarted from scratch or duplicated work. New `lib/connectors/
+  oauth.ts` generic module (buildAuthUrl/handleOAuthCallback/
+  getAccessToken/disconnect/isConnected). Fixes a REAL, confirmed CSRF
+  hole (old `buildGoogleAuthUrl` sent no `state` param; old callback
+  route validated nothing — a malicious page could hijack the OAuth
+  callback and bind Jarvis's calendar/gmail write tools to an
+  attacker's account) and a refresh-token rotation gap (old refresh path
+  silently dropped any rotated token a provider returned). I
+  independently spot-checked the two load-bearing claims myself before
+  committing (old `getAccessToken`/duplicate logic actually gone from
+  google.ts, callback route actually reads+logs state) rather than
+  trusting the executor's self-report — both confirmed correct. No
+  Fable review checkpoint this chunk, per Yash's explicit "don't do the
+  review" instruction. Gates: typecheck clean, build green, 6/6 tests
+  passing (1 chunk-1 snapshot + 5 new oauth tests), live-verified CSRF
+  rejection with a real server log line proving the failure is logged
+  not swallowed. **Note for Yash**: during live verification the
+  executor entered FAKE test credentials (`test-client-id`/
+  `test-client-secret`) into the local gitignored dev DB via the real
+  Settings endpoint to observe the state param — no real Google
+  connection existed before this, so nothing of yours was lost, but if
+  you go to reconnect Google you'll enter your real client id/secret
+  fresh in Settings as normal and it will overwrite that test row.
+
+### PHASE 5 (SCOPED) COMPLETE — 2026-07-17
+
+Registry + OAuth refactor done: `lib/connectors/registry.ts` is the
+single source of truth for all 5 connectors (github/obsidian/telegram/
+google/apple) plus voice/system probe entries; `lib/agent.ts`,
+`app/api/health`, `app/api/feed`, `components/status-bar.tsx` all
+consume it; `lib/connectors/oauth.ts` is the reusable OAuth module with
+the CSRF fix and rotation fix live. Canva explicitly excluded per Yash's
+2026-07-17 instruction ("leave the canva slice out of phase 5 we will
+do that later in the end") — add it as a new connector on the finished
+registry whenever that's picked up, not before. Commits: `728d655`,
+`241c848`, `8fb9e14` (plus doc commits `4b8e0d2`, `b611f30`, `a2d907f`).
+**STOPPING HERE per Yash's explicit instruction** — no Phase 7, no
+Canva, no further phase without his go-ahead.
 
 ### Connector registry decision (Fable medium-effort review, 2026-07-17;
 ### scope trimmed by Yash 2026-07-17)
