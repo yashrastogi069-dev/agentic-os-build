@@ -3,23 +3,89 @@
 Cross-session resume contract. Read this (and `tasks/PLAN.md`, `tasks/lessons.md`)
 before starting any new work on this project.
 
-## Current Phase (updated 2026-07-16, live)
+## Current Phase (updated 2026-07-17, live)
 
-**Phase 0, 1, 2, 3 (all chunks) COMPLETE. Phase 4 (Shell & panels
-redesign) SHIPPED 2026-07-16.** Phase 6 (Voice + intelligence) IN PROGRESS,
-started 2026-07-16 (Chunks A/B/D shipped, C/E/F/G remaining). See sections
-below for detail. Planned sequence: complete Phase 6, hold for Yash approval,
-then Phase 7 (dictation companion + proactive assistance).
+**Phase 0, 1, 2, 3 (all chunks) COMPLETE. Phase 4 SHIPPED. Phase 6 CORE
+COMPLETE + LIVE-VERIFIED 2026-07-17** (Chunks A/B/C/D/E shipped, plus new
+H/I; only polish chunks F/G remain). At the HOLD POINT: awaiting Yash's
+visual review before Phase 7. Dev server left running on :3100 for that
+review. After approval the next phase is the connector registry + Canva
+extensibility (Fable medium-effort design recorded in this session — see
+"Connector registry decision" below), then Phase 7.
 
-### Phase 6 — Voice mode 1 + assistant intelligence core (IN PROGRESS, started 2026-07-16)
+### Phase 6 — Voice mode 1 + assistant intelligence core (CORE DONE 2026-07-17)
 
-Chunks A (Windows voice foundation + benchmark spike) and B (server voice infra) SHIPPED. Chunk D groundwork + full (sessions + context core) SHIPPED. Remaining: Chunks C (client voice loop), E (tasks + reminders + notifications UI), F (latency optimization), G (verification matrix). Full spec: `tasks/MASTER_PLAN_V2.md` §5. Benchmarks: `tasks/PHASE6_BENCH.md` (STT warm RTF 0.14-0.21, Piper daemon 116-335ms/sentence warm).
+LIVE SMOKE TEST PASSED on :3100 (2026-07-17): `pnpm build` green (all 24
+routes generate); `/` returns 200; `/api/health` db.ok + memory intact;
+`/api/voice/status` reports Piper installed (binPresent/voicePresent) with
+honest STT-sidecar-down state; end-to-end reminder pipeline verified — a
+past-due task fired a dedupe-keyed notification via the instrumentation-
+started scheduler, appeared in the queue AND the feed, and acked cleanly;
+`/api/voice/speak` synthesized real audio (HTTP 200, 89KB wav);
+`/api/wake-words` returns the seeded "jarvis" entry. Full spec:
+`tasks/MASTER_PLAN_V2.md` §5. Benchmarks: `tasks/PHASE6_BENCH.md`.
+
+- **Chunk C — client voice loop**: SHIPPED, commit 940750a. AudioWorklet
+  recorder (`public/worklets/capture-processor.js` + `lib/voice/recorder.ts`
+  WorkletRecorder w/ 300ms pre-roll), `lib/voice/vad.ts` (energy VAD,
+  auto speech start/end), `lib/voice/sentence-chunker.ts`,
+  `lib/voice/tts-queue.ts` (gapless scheduled playback, barge-in w/ 60ms
+  fade, abort in-flight synth), `components/voice/voice-controller.tsx`
+  (state machine idle/listening/transcribing/thinking/speaking, owns the
+  toggle-mic listener + mic button, follow-up window). Barge-in works: you
+  can interrupt mid-sentence.
+- **Chunk E — reminder scheduler + notifications + tasks panel**: SHIPPED,
+  commit 94039ce. `lib/scheduler.ts` (globalThis-guarded 30s interval,
+  dedupe-keyed firing, recurrence advance, missed-while-off announce-once),
+  `instrumentation.ts` (starts scheduler on server boot), `app/api/
+  notifications` (SSE live push + JSON fallback + ack/snooze),
+  `app/api/tasks(/[id])` REST, `components/hud/notification-toasts.tsx`
+  (EventSource toasts, speaks reminder aloud during a voice session),
+  `components/tasks-panel.tsx` (6th HUD panel, Alt+6).
+- **Chunk H — wake-word system** (NEW, user-requested): SHIPPED, commits
+  00881e4 + 40a968f (client/server boundary fix). Say "Jarvis" to activate
+  hands-free; extensible phrase->action registry (add more trigger words
+  later). `lib/wake-words.ts` (server registry) + `lib/wake-words-match.ts`
+  (pure client-safe matcher) + `app/api/wake-words` + `components/voice/
+  wake-word-listener.tsx` (own recorder+VAD, pauses during a conversation,
+  honest "listening" indicator, self-disables on mic-denied). Wake-word
+  tools in the agent so "add a wake word X" works via chat.
+- **Chunk I — full read+write connectors** (NEW, user-requested): SHIPPED,
+  commit 6f0a4b5. GitHub createIssue/commentOnIssue (confirmation-gated),
+  Google createCalendarEvent + sendGmail (gmail scope widened — EXISTING
+  GOOGLE CONNECTIONS MUST RECONNECT in Settings for the new consent grant),
+  Apple createCalendarEvent (CalDAV PUT). Obsidian/Telegram already had
+  write. Visible-to-others actions preview-then-confirm before firing.
+- **Voice hotkey**: changed to Right Alt alone (was Alt+J), commit 8d8ddd4.
+- **Chunk A — Windows voice foundation + benchmark spike** and **Chunk B —
+  server voice infra**: SHIPPED (see below, unchanged).
+
+- **Remaining (polish, not blocking the hold-point review)**: Chunk F
+  (latency instrumentation to hit p50<=1.8s + a tone-prefs Settings UI — the
+  prefs already work + persist via the agent's setPreference tool today, the
+  UI is convenience), Chunk G (formal verification matrix + Fable taste pass
+  on the new surfaces).
+
+### Connector registry decision (Fable medium-effort review, 2026-07-17)
+
+For "add tools like Canva in future": build a minimal slice of Phase 5 next
+(NOT the full phase). In scope: `lib/connectors/registry.ts`
+(`{id,label,promptHint,probe,sync?,tools,auth?}`) that health/feed/status/
+agent-tools iterate; `lib/connectors/oauth.ts` extracted from google.ts but
+built for refresh-token ROTATION + PKCE (Google needs neither, Canva needs
+both) with the CSRF `state` fix folded in; Canva as connector #6 to prove
+the pattern. Two gaps Fable caught: `lib/agent.ts` INSTRUCTIONS hardcodes
+per-connector capability prose (needs a `promptHint` per registry entry or
+new tools stay invisible to the model), and Google's OAuth can't be copied
+verbatim. Deferred: MCP key masking, local-fs connector, Obsidian depth,
+live matrix. "Memory not just read-only" = write-capability (done), NOT
+auto-ingestion.
 
 - **Chunk A — Windows voice foundation + benchmark spike**: SHIPPED, commit 8887669. `tools/stt-server` (faster-whisper sidecar on 127.0.0.1:8765, shares dictation tool's cached model), `scripts/setup-voice.ps1` (Piper 2023.11.14-2 + en_US-lessac-medium voice, pinned/idempotent). See `tasks/PHASE6_BENCH.md` for measured numbers.
 - **Chunk B — server voice infra**: SHIPPED, commit b3d85ef. `lib/voice/stt.ts` (transcribeWav chain: sidecar → guarded auto-start+retry → whisper-cli fallback → honest VoiceUnavailableError), `lib/voice/piper.ts` (persistent daemon, globalThis-guarded singleton, serialized queue, 5min idle-unload, crash recovery), rewritten `app/api/voice/transcribe` + `speak` routes, new `app/api/voice/status` route, `lib/voice/paths.ts` updated for Windows .exe suffixing and sidecar/daemon paths.
 - **Chunk D groundwork + full (sessions + context core)**: SHIPPED, commits b3d85ef (schema/assistant persona) + d83e457 (sessions/tasks/notifications/agent wiring). `lib/db/schema.ts` gained `chat_sessions`, `chat_messages`, `tasks`, `notifications` (SCHEMA_VERSION 4 — shared notification queue per MASTER_PLAN_V2 §1 SS1, dedupe_key unique for Phase 7 compatibility). `lib/assistant/prompt.ts` (persona + tone/verbosity/address preferences persisted in connector_settings, text vs voice response contracts), `lib/assistant/context.ts` (per-turn context: time, session summary, open tasks <48h, top-5 memories, fail-soft). `lib/sessions.ts` (session/message CRUD + rolling summarization via generateText, fail-soft), `lib/tasks.ts` (CRUD + recurrence: daily/weekdays/weekly/monthly, completeTask spins off next occurrence), `lib/db/notifications.ts` (enqueue/list-pending/ack/snooze/mark-delivered). `lib/agent.ts` gained taskTools + preferenceTools (setPreference persists "be more casual" style requests across restarts) wired into allTools; streamOsAgentResponse gained extraContext + onSessionPersist hooks. `app/api/chat/route.ts` now creates/resumes sessions (X-Session-Id header), persists both turns, injects turn context as system message, fires summarization after each turn. New `app/api/sessions(/[id])` routes for session list/resume.
-- **Not yet built**: Chunk C (client voice loop: AudioWorklet recorder, VAD, sentence chunker, TTS queue, voice-controller, reactor wiring, barge-in), Chunk E (reminder scheduler + SSE toasts + tasks panel UI + 6th edge-rail icon — data layer exists but nothing fires or displays yet), Chunk F (latency optimization + tone prefs UI), Chunk G (verification matrix + hold for Yash).
-- **Gates status**: `pnpm typecheck` clean after every commit. `pnpm build` and live dev-server verification NOT YET RUN this session — do that before Phase 6 is called done.
+- **Gates status**: `pnpm typecheck` clean after every commit; `pnpm build`
+  green; live dev-server smoke test PASSED (see top of Phase 6 section).
 
 ### Phase 4 — SHIPPED (2026-07-16)
 
