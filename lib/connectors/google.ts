@@ -1,7 +1,14 @@
 import { tool } from "ai"
 import { z } from "zod"
 import { addEvent } from "@/lib/events"
-import { getConnectorConfig, setConnectorConfig } from "@/lib/settings"
+import { getConnectorConfig } from "@/lib/settings"
+import {
+  buildAuthUrl,
+  getAccessToken as oauthGetAccessToken,
+  handleOAuthCallback,
+  isConnected,
+  type OAuthDescriptor,
+} from "@/lib/connectors/oauth"
 
 /**
  * Google Calendar + Gmail connector — user's own OAuth credentials, free.
@@ -16,11 +23,25 @@ import { getConnectorConfig, setConnectorConfig } from "@/lib/settings"
  * write tools work — read tools are unaffected.
  */
 
-const SCOPES = [
-  "https://www.googleapis.com/auth/calendar",
-  "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/gmail.send",
-].join(" ")
+/**
+ * OAuth descriptor for Google. The generic module in lib/connectors/oauth.ts
+ * owns state/CSRF protection, PKCE (unused here), and refresh-token rotation;
+ * only the provider-specific endpoints, scopes, and auth params live here.
+ * access_type=offline + prompt=consent guarantee a refresh token every time.
+ */
+const googleOAuth: OAuthDescriptor = {
+  settingsKey: "google",
+  authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+  tokenUrl: "https://oauth2.googleapis.com/token",
+  scopes: [
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+  ],
+  extraAuthParams: { access_type: "offline", prompt: "consent" },
+  pkce: false,
+  clientAuth: "body",
+}
 
 export interface GoogleSettings extends Record<string, unknown> {
   clientId: string
@@ -38,80 +59,21 @@ export function getGoogleSettings(): GoogleSettings | null {
 }
 
 export function isGoogleConnected(): boolean {
-  return Boolean(getGoogleSettings()?.refreshToken)
+  return isConnected(googleOAuth)
 }
 
+/** Build Google's consent-screen URL (now with CSRF `state`), via the oauth module. */
 export function buildGoogleAuthUrl(redirectUri: string): string {
-  const settings = getGoogleSettings()
-  if (!settings) throw new Error("Google client id/secret not configured in Settings.")
-  const params = new URLSearchParams({
-    client_id: settings.clientId,
-    redirect_uri: redirectUri,
-    response_type: "code",
-    scope: SCOPES,
-    access_type: "offline",
-    prompt: "consent", // always return a refresh token
-  })
-  return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+  return buildAuthUrl(googleOAuth, redirectUri)
 }
 
-export async function exchangeGoogleCode(code: string, redirectUri: string): Promise<void> {
-  const settings = getGoogleSettings()
-  if (!settings) throw new Error("Google client id/secret not configured.")
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: settings.clientId,
-      client_secret: settings.clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    }),
-  })
-  const json = (await res.json()) as {
-    access_token?: string
-    refresh_token?: string
-    expires_in?: number
-    error_description?: string
-  }
-  if (!res.ok || !json.refresh_token) {
-    throw new Error(`Google token exchange failed: ${json.error_description ?? res.status}`)
-  }
-  setConnectorConfig("google", {
-    ...settings,
-    refreshToken: json.refresh_token,
-    accessToken: json.access_token,
-    accessTokenExpiresAt: Date.now() + (json.expires_in ?? 3600) * 1000 - 60_000,
-  })
+/** Validate `state` and exchange the callback code for tokens, via the oauth module. */
+export async function exchangeGoogleCode(params: URLSearchParams, redirectUri: string): Promise<void> {
+  await handleOAuthCallback(googleOAuth, params, redirectUri)
 }
 
 async function getAccessToken(): Promise<string> {
-  const settings = getGoogleSettings()
-  if (!settings?.refreshToken) {
-    throw new Error("Google is not connected. Complete the OAuth flow in Settings.")
-  }
-  if (settings.accessToken && (settings.accessTokenExpiresAt ?? 0) > Date.now()) {
-    return settings.accessToken
-  }
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      refresh_token: settings.refreshToken,
-      client_id: settings.clientId,
-      client_secret: settings.clientSecret,
-      grant_type: "refresh_token",
-    }),
-  })
-  const json = (await res.json()) as { access_token?: string; expires_in?: number }
-  if (!res.ok || !json.access_token) throw new Error("Google token refresh failed — reconnect in Settings.")
-  setConnectorConfig("google", {
-    ...settings,
-    accessToken: json.access_token,
-    accessTokenExpiresAt: Date.now() + (json.expires_in ?? 3600) * 1000 - 60_000,
-  })
-  return json.access_token
+  return oauthGetAccessToken(googleOAuth)
 }
 
 async function gFetch<T>(url: string): Promise<T> {
