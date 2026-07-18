@@ -418,7 +418,7 @@ export function SettingsPanel() {
             }}
           >
             <HudInput
-              type="email"
+              type="text"
               value={appleId}
               onChange={(e) => setAppleId(e.target.value)}
               placeholder="Apple ID email"
