@@ -62,6 +62,38 @@ function extractHrefs(xml: string): string[] {
   return hrefs
 }
 
+function unescapeXmlEntities(value: string): string {
+  return value
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&")
+}
+
+/**
+ * Extract per-resource { href, calendarData } pairs from a REPORT
+ * (calendar-query) multistatus response. Each <D:response> wraps one
+ * resource's <D:href> alongside its <C:calendar-data> — unlike
+ * extractHrefs (used for PROPFIND discovery), this keeps the href tied to
+ * its own event data so a fetched event can later be updated/deleted by
+ * targeting the exact resource it came from.
+ */
+function extractResponseItems(xml: string): Array<{ href: string; calendarData: string }> {
+  const items: Array<{ href: string; calendarData: string }> = []
+  const responseRe = /<(?:[\w-]+:)?response\b[^>]*>([\s\S]*?)<\/(?:[\w-]+:)?response>/gi
+  let match: RegExpExecArray | null
+  while ((match = responseRe.exec(xml)) !== null) {
+    const block = match[1]
+    const hrefMatch = /<(?:[\w-]+:)?href[^>]*>([^<]+)<\/(?:[\w-]+:)?href>/i.exec(block)
+    const dataMatch = /<(?:[\w-]+:)?calendar-data[^>]*>([\s\S]*?)<\/(?:[\w-]+:)?calendar-data>/i.exec(block)
+    if (hrefMatch && dataMatch) {
+      items.push({ href: hrefMatch[1].trim(), calendarData: unescapeXmlEntities(dataMatch[1]) })
+    }
+  }
+  return items
+}
+
 /** Discover the user's calendar collection URLs. */
 async function discoverCalendars(settings: AppleSettings): Promise<string[]> {
   // 1. principal
@@ -149,7 +181,15 @@ function parseIcsEvents(ics: string): Array<{
 
 /** Query upcoming VEVENTs across all discovered calendars. */
 export async function getAppleEvents(days = 7): Promise<
-  Array<{ uid: string; title: string; start: string; end: string; location?: string; calendar: string }>
+  Array<{
+    uid: string
+    title: string
+    start: string
+    end: string
+    location?: string
+    calendar: string
+    href: string
+  }>
 > {
   const settings = getAppleSettings()
   if (!settings) throw new Error("Apple Calendar is not configured. Add Apple ID + app password in Settings.")
@@ -159,8 +199,15 @@ export async function getAppleEvents(days = 7): Promise<
   const max = new Date(now.getTime() + days * 86_400_000)
 
   const calendars = await discoverCalendars(settings)
-  const all: Array<{ uid: string; title: string; start: string; end: string; location?: string; calendar: string }> =
-    []
+  const all: Array<{
+    uid: string
+    title: string
+    start: string
+    end: string
+    location?: string
+    calendar: string
+    href: string
+  }> = []
 
   for (const cal of calendars.slice(0, 10)) {
     try {
@@ -171,7 +218,7 @@ export async function getAppleEvents(days = 7): Promise<
         "1",
         `<?xml version="1.0" encoding="utf-8"?>
          <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
-           <D:prop><C:calendar-data/></D:prop>
+           <D:prop><D:getetag/><C:calendar-data/></D:prop>
            <C:filter>
              <C:comp-filter name="VCALENDAR">
                <C:comp-filter name="VEVENT">
@@ -182,14 +229,31 @@ export async function getAppleEvents(days = 7): Promise<
          </C:calendar-query>`,
       )
       const calName = cal.split("/").filter(Boolean).pop() ?? "calendar"
-      for (const event of parseIcsEvents(xml)) {
-        all.push({ ...event, calendar: calName })
+      // Extract href alongside calendar-data per <D:response> so each parsed
+      // event can be traced back to the exact resource it came from — this
+      // is what makes update/delete possible for events fetched here, not
+      // only for events Jarvis itself created.
+      for (const item of extractResponseItems(xml)) {
+        for (const event of parseIcsEvents(item.calendarData)) {
+          all.push({ ...event, calendar: calName, href: item.href })
+        }
       }
     } catch {
       // skip unreadable calendars (shared/subscription edge cases)
     }
   }
   return all.sort((a, b) => a.start.localeCompare(b.start))
+}
+
+/** Find a single event by UID across the discovered calendars within a time window. */
+async function findAppleEventByUid(
+  uid: string,
+  days: number,
+): Promise<
+  { uid: string; title: string; start: string; end: string; location?: string; calendar: string; href: string } | null
+> {
+  const events = await getAppleEvents(days)
+  return events.find((event) => event.uid === uid) ?? null
 }
 
 function toIcsUtc(iso: string): string {
@@ -255,6 +319,133 @@ export async function createAppleEvent(
   return { uid, url: eventUrl }
 }
 
+/**
+ * Update an existing event by PUTting a revised .ics body to its resource
+ * URL. The resource URL comes from `findAppleEventByUid`, which resolves it
+ * via the per-item href captured by `getAppleEvents` (see
+ * `extractResponseItems`) — this works for ANY event, not only ones Jarvis
+ * created, because the href is read back from the server's own REPORT
+ * response rather than reconstructed from a naming convention.
+ *
+ * Uses an unconditional `If-Match: *` rather than tracking/round-tripping a
+ * real ETag: this is a single-user, local-first tool with no concurrent
+ * writers to guard against, and ETag tracking would mean persisting a
+ * per-event ETag somewhere and threading it through every read/write call
+ * for a benefit (protecting against a lost update from a second writer)
+ * that doesn't apply here. `If-Match: *` still keeps the one safety
+ * property worth having for free: it fails with 412 if the resource was
+ * deleted since it was fetched, instead of silently creating a new one.
+ */
+export async function updateAppleEvent(
+  uid: string,
+  updates: { summary?: string; startISO?: string; endISO?: string; location?: string },
+  searchDays = 90,
+): Promise<{ uid: string; url: string }> {
+  const settings = getAppleSettings()
+  if (!settings) throw new Error("Apple Calendar is not configured. Add Apple ID + app password in Settings.")
+
+  const existing = await findAppleEventByUid(uid, searchDays)
+  if (!existing) {
+    throw new Error(
+      `Apple Calendar: no event found with uid "${uid}" within the next ${searchDays} days. It may be further out, already past, or already deleted — widen searchDays or re-check the uid.`,
+    )
+  }
+
+  const summary = updates.summary ?? existing.title
+  const startISO = updates.startISO ?? existing.start
+  const endISO = updates.endISO ?? existing.end
+  const location = updates.location !== undefined ? updates.location : existing.location
+
+  const dtstamp = toIcsUtc(new Date().toISOString())
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Jarvis//EN",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART:${toIcsUtc(startISO)}`,
+    `DTEND:${toIcsUtc(endISO)}`,
+    `SUMMARY:${escapeIcsText(summary)}`,
+    ...(location ? [`LOCATION:${escapeIcsText(location)}`] : []),
+    "END:VEVENT",
+    "END:VCALENDAR",
+    "",
+  ].join("\r\n")
+
+  const eventUrl = new URL(existing.href, ICLOUD_CALDAV).toString()
+
+  const res = await fetch(eventUrl, {
+    method: "PUT",
+    headers: {
+      Authorization: authHeader(settings),
+      "Content-Type": "text/calendar; charset=utf-8",
+      "If-Match": "*",
+    },
+    body: ics,
+    signal: AbortSignal.timeout(20_000),
+  })
+  if (!res.ok) {
+    throw new Error(`CalDAV PUT (update) ${eventUrl} failed: ${res.status} ${await res.text()}`)
+  }
+  return { uid, url: eventUrl }
+}
+
+/**
+ * Delete an event by HTTP DELETE to its resource URL, resolved the same way
+ * as `updateAppleEvent` (href captured off the REPORT response, not
+ * reconstructed).
+ */
+export async function deleteAppleEvent(uid: string, searchDays = 90): Promise<{ uid: string }> {
+  const settings = getAppleSettings()
+  if (!settings) throw new Error("Apple Calendar is not configured. Add Apple ID + app password in Settings.")
+
+  const existing = await findAppleEventByUid(uid, searchDays)
+  if (!existing) {
+    throw new Error(
+      `Apple Calendar: no event found with uid "${uid}" within the next ${searchDays} days. It may be further out, already past, or already deleted — widen searchDays or re-check the uid.`,
+    )
+  }
+
+  const eventUrl = new URL(existing.href, ICLOUD_CALDAV).toString()
+  const res = await fetch(eventUrl, {
+    method: "DELETE",
+    headers: { Authorization: authHeader(settings) },
+    signal: AbortSignal.timeout(20_000),
+  })
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`CalDAV DELETE ${eventUrl} failed: ${res.status} ${await res.text()}`)
+  }
+  return { uid }
+}
+
+/**
+ * Search upcoming events by a case-insensitive substring match on title or
+ * location. iCloud's CalDAV REPORT does support a server-side
+ * <C:text-match> prop-filter per RFC 4791, but wiring that XML correctly
+ * cannot be confirmed without a live successful REPORT against a real
+ * account (currently blocked by Yash's account-side 401). Filtering
+ * client-side over the already-time-windowed, already-working
+ * `getAppleEvents` is simpler and certainly correct, so that's the chosen
+ * approach — no fragile unverified XML filter added on a hunch.
+ */
+export async function searchAppleEvents(
+  query: string,
+  days = 30,
+): Promise<
+  Array<{ uid: string; title: string; start: string; end: string; location?: string; calendar: string; href: string }>
+> {
+  const settings = getAppleSettings()
+  if (!settings) throw new Error("Apple Calendar is not configured. Add Apple ID + app password in Settings.")
+
+  const q = query.trim().toLowerCase()
+  if (!q) return []
+  const events = await getAppleEvents(days)
+  return events.filter(
+    (event) => event.title.toLowerCase().includes(q) || (event.location ?? "").toLowerCase().includes(q),
+  )
+}
+
 export async function checkApple(): Promise<boolean> {
   const settings = getAppleSettings()
   if (!settings) return false
@@ -310,5 +501,75 @@ export const appleTools = {
       const result = await createAppleEvent(summary, startISO, endISO, location)
       return { created: true, ...result }
     },
+  }),
+  updateAppleCalendarEvent: tool({
+    description:
+      "Update an existing Apple/iCloud Calendar event (summary/start/end/location, all optional except uid). Modifies a real calendar entry, so this requires explicit confirmation: call with confirmed:false first to preview exactly what would change, show it to the user, and only call again with confirmed:true after they explicitly approve it in this turn or a prior turn.",
+    inputSchema: z.object({
+      uid: z.string().describe("The event's UID, as returned by getAppleCalendarEvents or searchAppleCalendarEvents."),
+      summary: z.string().optional().describe("New title. Omit to keep the existing title."),
+      startISO: z.string().optional().describe("New start time as an ISO 8601 datetime. Omit to keep existing."),
+      endISO: z.string().optional().describe("New end time as an ISO 8601 datetime. Omit to keep existing."),
+      location: z.string().optional().describe("New location. Omit to keep existing."),
+      searchDays: z
+        .number()
+        .int()
+        .min(1)
+        .max(365)
+        .optional()
+        .describe("How many days ahead to search for the event by uid (default 90)."),
+      confirmed: z
+        .boolean()
+        .describe(
+          "Set true ONLY after the user has explicitly approved the exact change in this turn or a prior turn of this conversation. If the user has not confirmed, call this tool with confirmed:false first to show them exactly what would change, and wait for their explicit yes before calling again with confirmed:true.",
+        ),
+    }),
+    execute: async ({ uid, summary, startISO, endISO, location, searchDays, confirmed }) => {
+      if (!confirmed) {
+        return {
+          updated: false,
+          preview: { uid, summary, startISO, endISO, location },
+          requiresConfirmation: true,
+        }
+      }
+      const result = await updateAppleEvent(uid, { summary, startISO, endISO, location }, searchDays ?? 90)
+      return { updated: true, ...result }
+    },
+  }),
+  deleteAppleCalendarEvent: tool({
+    description:
+      "Delete an event from the user's Apple/iCloud Calendar by uid. Permanently removes a real calendar entry, so this requires explicit confirmation: call with confirmed:false first to preview which event would be deleted, show it to the user, and only call again with confirmed:true after they explicitly approve it in this turn or a prior turn.",
+    inputSchema: z.object({
+      uid: z.string().describe("The event's UID, as returned by getAppleCalendarEvents or searchAppleCalendarEvents."),
+      searchDays: z
+        .number()
+        .int()
+        .min(1)
+        .max(365)
+        .optional()
+        .describe("How many days ahead to search for the event by uid (default 90)."),
+      confirmed: z
+        .boolean()
+        .describe(
+          "Set true ONLY after the user has explicitly approved the deletion in this turn or a prior turn of this conversation. If the user has not confirmed, call this tool with confirmed:false first to show them exactly which event would be deleted, and wait for their explicit yes before calling again with confirmed:true.",
+        ),
+    }),
+    execute: async ({ uid, searchDays, confirmed }) => {
+      if (!confirmed) {
+        const existing = await findAppleEventByUid(uid, searchDays ?? 90)
+        return { deleted: false, preview: existing, requiresConfirmation: true }
+      }
+      const result = await deleteAppleEvent(uid, searchDays ?? 90)
+      return { deleted: true, ...result }
+    },
+  }),
+  searchAppleCalendarEvents: tool({
+    description:
+      "Search the user's upcoming Apple/iCloud Calendar events by a case-insensitive substring match against title or location. Read-only.",
+    inputSchema: z.object({
+      query: z.string().describe("Text to search for in the event title or location."),
+      days: z.number().int().min(1).max(365).optional().describe("How many days ahead to search (default 30)."),
+    }),
+    execute: async ({ query, days }) => ({ events: await searchAppleEvents(query, days ?? 30) }),
   }),
 }

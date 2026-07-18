@@ -13,7 +13,7 @@ import {
   type Tool,
 } from "ai"
 import { z } from "zod"
-import { saveMemory, recallMemory } from "@/lib/memory"
+import { saveMemory, recallMemory, listMemories, deleteMemory, getMemory } from "@/lib/memory"
 import {
   resolveModel,
   getResolutionChain,
@@ -76,6 +76,59 @@ const memoryTools = {
           createdAt: new Date(m.createdAt).toISOString(),
         })),
       }
+    },
+  }),
+  listMemories: tool({
+    description:
+      "List stored long-term memories, most recent first, optionally filtered by category. Read-only — use this to audit what's remembered, find a memory's id before deleting it, or answer 'what do you remember about me' comprehensively (recallMemory only returns semantically relevant matches, not everything).",
+    inputSchema: z.object({
+      limit: z.number().int().min(1).max(100).optional().describe("Max rows to return. Defaults to 20, capped at 100."),
+      category: z.string().optional().describe("Optionally restrict to one category."),
+    }),
+    execute: async ({ limit, category }) => {
+      const results = listMemories(limit ?? 20, category)
+      return {
+        memories: results.map((m) => ({
+          id: m.id,
+          content: m.content,
+          category: m.category,
+          source: m.source,
+          createdAt: new Date(m.createdAt).toISOString(),
+        })),
+      }
+    },
+  }),
+  deleteMemory: tool({
+    description:
+      "Permanently delete a stored memory by id (from listMemories or recallMemory), removing it from both the memory table and its search index so it can never resurface. Requires explicit confirmation: call with confirmed:false first, which returns the exact memory content that WOULD be deleted without touching anything — show that content to the user and only call again with confirmed:true after they explicitly approve deleting that specific memory in this turn or a prior turn.",
+    inputSchema: z.object({
+      id: z.number().int().min(1).describe("The memory id to delete, as returned by listMemories or recallMemory."),
+      confirmed: z
+        .boolean()
+        .describe(
+          "Set true ONLY after the user has explicitly approved deleting this exact memory in this turn or a prior turn of this conversation. If not yet confirmed, call with confirmed:false first to show them exactly what would be deleted, and wait for their explicit yes before calling again with confirmed:true.",
+        ),
+    }),
+    execute: async ({ id, confirmed }) => {
+      const existing = getMemory(id)
+      if (!existing) {
+        return { deleted: false, found: false, message: `No memory found with id ${id}.` }
+      }
+      if (!confirmed) {
+        return {
+          deleted: false,
+          requiresConfirmation: true,
+          preview: {
+            id: existing.id,
+            content: existing.content,
+            category: existing.category,
+            source: existing.source,
+            createdAt: new Date(existing.createdAt).toISOString(),
+          },
+        }
+      }
+      deleteMemory(id)
+      return { deleted: true, id }
     },
   }),
 }
@@ -313,7 +366,7 @@ const preferenceTools = {
 export const INSTRUCTIONS = `You are Agentic OS — a personal AI operating system running locally on the user's machine.
 
 Capabilities:
-- Long-term memory: saveMemory / recallMemory. Proactively recall context before answering personal questions; proactively save durable facts the user shares.
+- Long-term memory: saveMemory / recallMemory / listMemories / deleteMemory. Proactively recall context before answering personal questions; proactively save durable facts the user shares. Use listMemories to audit what's stored or find an id. deleteMemory requires confirmation: call with confirmed:false to preview the exact content, then confirmed:true only after the user explicitly approves forgetting that specific memory.
 - Tasks & reminders: createTask / listTasks / completeTask / snoozeTask / updateTask. When the user mentions anything time-bound ("remind me", "by Friday", "tomorrow morning"), create a task instead of just acknowledging.
 - Preferences: setPreference persists tone/verbosity/how to address the user across sessions — use it when the user says things like "be more casual" instead of just complying for one turn.
 ${connectorPromptLines()}

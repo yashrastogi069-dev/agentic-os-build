@@ -280,6 +280,25 @@ export function listMemories(limit = 50, category?: string): MemoryRecord[] {
   }))
 }
 
+/** Fetch a single memory by id, or undefined if it doesn't exist. */
+export function getMemory(id: number): MemoryRecord | undefined {
+  const db = getRawDb()
+  const row = db
+    .prepare(`SELECT id, content, category, source, created_at, updated_at FROM memories WHERE id = ?`)
+    .get(id) as
+    | { id: number; content: string; category: string; source: string; created_at: number; updated_at: number }
+    | undefined
+  if (!row) return undefined
+  return {
+    id: row.id,
+    content: row.content,
+    category: row.category,
+    source: row.source,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
 export function deleteMemory(id: number): void {
   const db = getRawDb()
   const tx = db.transaction(() => {
