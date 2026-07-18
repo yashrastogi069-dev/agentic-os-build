@@ -10,5 +10,7 @@
   "paste_delay_ms": 300,
   "restore_clipboard": true,
   "llm_cleanup_enabled": false,
-  "llm_model": "llama3.2:3b"
+  "llm_model": "llama3.2:3b",
+  "jarvis_url": "http://127.0.0.1:3000",
+  "jarvis_token": ""
 }

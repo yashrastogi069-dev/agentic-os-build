@@ -17,6 +17,8 @@ DEFAULTS = {
     "restore_clipboard": True,
     "llm_cleanup_enabled": False,
     "llm_model": "llama3.2:3b",
+    "jarvis_url": "http://127.0.0.1:3000",
+    "jarvis_token": "",
 }
 
 

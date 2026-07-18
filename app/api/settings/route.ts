@@ -4,6 +4,8 @@ import {
   setConnectorConfig,
   getMcpKey,
   regenerateMcpKey,
+  getSystemToken,
+  regenerateSystemToken,
   getObsidianSettings,
   DEFAULT_GROQ_MODEL,
 } from "@/lib/settings"
@@ -22,6 +24,7 @@ export async function GET() {
   return NextResponse.json({
     chat: getChatSettings(),
     mcp: { key: getMcpKey() },
+    system: { token: getSystemToken() },
     obsidian: obsidian
       ? { configured: true, baseUrl: obsidian.baseUrl }
       : { configured: false, baseUrl: "http://127.0.0.1:27123" },
@@ -137,6 +140,10 @@ export async function POST(request: Request) {
     case "regenerateMcpKey": {
       const key = regenerateMcpKey()
       return NextResponse.json({ ok: true, key })
+    }
+    case "regenerateSystemToken": {
+      const token = regenerateSystemToken()
+      return NextResponse.json({ ok: true, token })
     }
     default:
       return NextResponse.json({ error: "unknown action" }, { status: 400 })

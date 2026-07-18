@@ -75,6 +75,32 @@ export function verifyMcpKey(provided: string | null): boolean {
   return a.length === b.length && crypto.timingSafeEqual(a, b)
 }
 
+/* ---------- System (companion) token ---------- */
+
+/**
+ * Bearer token for the local system/companion API surface (app/api/system/*).
+ * Auto-generates on first read so there is never a "not configured" open-auth
+ * window — do NOT add a null-token bypass anywhere that reads this.
+ */
+export function getSystemToken(): string {
+  const config = getConnectorConfig<{ token: string }>("system")
+  if (config?.token) return config.token
+  return regenerateSystemToken()
+}
+
+export function regenerateSystemToken(): string {
+  const token = crypto.randomBytes(16).toString("hex")
+  setConnectorConfig("system", { token })
+  return token
+}
+
+export function verifySystemToken(provided: string | null): boolean {
+  if (!provided) return false
+  const a = Buffer.from(getSystemToken())
+  const b = Buffer.from(provided)
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+
 /* ---------- Obsidian ---------- */
 
 export interface ObsidianSettings extends Record<string, unknown> {
