@@ -3,20 +3,20 @@
 Cross-session resume contract. Read this (and `tasks/PLAN.md`, `tasks/lessons.md`)
 before starting any new work on this project.
 
-## Current Phase (updated 2026-07-17, live)
+## Current Phase (updated 2026-07-18, live)
 
-**Phase 0, 1, 2, 3 (all chunks) COMPLETE. Phase 4 SHIPPED. Phase 6 CLOSED
-2026-07-17** — Yash tested live on his own :3000 dev server and confirmed
-voice works end-to-end (talk to Jarvis, it replies, hands-free via
-hotkey). His own words: "its working now but needs improvement... complete
-this phase first." Chunks A-E + H + I shipped and live-verified this
-session; chunks F (latency instrumentation + tone-prefs Settings UI) and G
-(formal verification matrix + Fable taste pass) are explicitly DEFERRED,
-not abandoned — see "Phase 6 polish backlog" below. **Phase 5 (scoped:
-connector registry + OAuth refactor, Canva excluded) is now ALSO CLOSED,
-2026-07-17** — see "PHASE 5 (SCOPED) COMPLETE" below. Stopped there per
-Yash's explicit instruction; next phase (7, or Canva) awaits his
-go-ahead.
+**Phase 0, 1, 2, 3 (all chunks) COMPLETE. Phase 4 SHIPPED. Phase 5
+(scoped: connector registry + OAuth refactor, Canva excluded) CLOSED
+2026-07-17. Phase 6 CLOSED AS-IS 2026-07-18** — core voice/assistant
+work (Chunks A-E, H, I) plus the F polish chunk (latency instrumentation,
+tone-prefs UI, 2 design fixes) all shipped and reviewed; the final
+formal verification pass was interrupted mid-run and never completed —
+see "PHASE 6 CLOSED AS-IS" below for the honest accounting, this is NOT
+being backfilled as done. Closed on Yash's explicit instruction: "close
+out phase 6 as-is and start with phase 7."
+
+**PHASE 7 IS NOW STARTING (2026-07-18)** — dictation companion + system
+presence + proactive assistance. See "PHASE 7 — STARTING" below.
 
 ### Phase 6 — Voice mode 1 + assistant intelligence core (CORE DONE 2026-07-17)
 
@@ -119,12 +119,35 @@ started scheduler, appeared in the queue AND the feed, and acked cleanly;
   `thinking` voice-state colors still don't match PHASE3_DESIGN.md's hue
   table, and `animate-pulse` lacks a reduced-motion fallback in two places
   (voice-controller.tsx, wake-word-listener.tsx).
-- **Remaining in the polish backlog**: formal verification pass (intent
-  test set, refresh-restores-conversation, tone-persists-across-restart —
-  the mechanism is proven, a dedicated pass hasn't run), RAM measurement
-  with the dictation app also running. Not blocking Phase 7, per Yash's
-  "lets do the left of phase 6 and then phase 7" — proceeding into Phase 7
-  now, will fold these remaining items in alongside it.
+### PHASE 6 CLOSED AS-IS — 2026-07-18
+
+Yash's explicit instruction: "close out phase 6 as-is and start with
+phase 7." A formal verification pass (intent test set, refresh-restores-
+conversation, tone-persists-across-restart, RAM measurement) was started
+but interrupted mid-run (killed while its live intent-test loop was
+still executing, 2026-07-18 — likely a deliberate stop given a concurrent
+question about background subagents consuming real credits/tokens even
+without foreground activity). **Honest status: this verification never
+completed.** The underlying mechanisms it was checking are already
+individually proven true elsewhere in this file (session persistence,
+tone persistence via the round-trip test in the Chunk F entry above,
+the Phase 6 smoke test's reminder pipeline) — but no dedicated ">=9/10
+intent test" pass or RAM number exists. If this matters later, rerun it
+as a standalone task; it is explicitly NOT going to be silently
+backfilled or claimed as done. Phase 6 (core + all polish that DID land)
+is closed on this basis, not on a false claim of 100% verification.
+
+### PHASE 7 — STARTING 2026-07-18
+
+Per `tasks/MASTER_PLAN_V2.md` section 6: dictation companion + system
+presence + proactive assistance. Adopting the WhisperFlow clone at
+`Desktop/Whisper clone` into `tools/dictate/`, building `app/api/system/*`
+(cleanup/observe/command/notifications, dedicated system token), the
+proactive trigger engine (`lib/assist/triggers.ts`: reminder-due,
+calendar-soon, job-finished, morning-digest, connector-down) with
+Windows toasts + ntfy.sh push, and F9 ask-Jarvis-anywhere. Chunks: 0
+repo adoption, 1 API surface, 2 companion completion, 3 ask-anywhere, 4
+proactive engine, 5 docs+closeout. Progress logged below as chunks land.
 
 ### Phase 5 progress log (updated as chunks land, 2026-07-17)
 
