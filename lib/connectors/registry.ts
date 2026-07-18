@@ -109,7 +109,8 @@ export const CONNECTORS: ConnectorEntry[] = [
   {
     id: "google",
     label: "Google",
-    promptHint: "Google: getCalendarEvents / getRecentEmails (when the user connects Google in Settings).",
+    promptHint:
+      "Google: getCalendarEvents / getRecentEmails / searchGmail / readEmail / replyToEmail / searchCalendarEvents / updateCalendarEvent / deleteCalendarEvent (when the user connects Google in Settings). searchGmail supports Gmail's own query syntax (from:, subject:, after:, has:attachment). readEmail fetches the full body of a specific message by id -- use it after searchGmail/getRecentEmails to actually read content, not just the subject/snippet. updateCalendarEvent, deleteCalendarEvent, and replyToEmail require confirmation: call with confirmed:false first to preview, then confirmed:true only after the user explicitly approves.",
     probe: async () => {
       const credentials = Boolean(getGoogleSettings())
       const connected = isGoogleConnected()
@@ -125,7 +126,8 @@ export const CONNECTORS: ConnectorEntry[] = [
   {
     id: "apple",
     label: "Apple",
-    promptHint: "Apple Calendar: getAppleCalendarEvents via iCloud (when Apple ID + app password are configured).",
+    promptHint:
+      "Apple Calendar: getAppleCalendarEvents / searchAppleCalendarEvents / updateAppleCalendarEvent / deleteAppleCalendarEvent via iCloud (when Apple ID + app password are configured). updateAppleCalendarEvent and deleteAppleCalendarEvent require confirmation: call with confirmed:false first to preview, then confirmed:true only after the user explicitly approves.",
     probe: async (opts) => {
       const configured = Boolean(getAppleSettings()?.appleId && getAppleSettings()?.appPassword)
       if (opts?.live) {
