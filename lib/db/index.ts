@@ -21,7 +21,7 @@ const DB_PATH = process.env.AGENTIC_OS_DB_PATH ?? path.join(DB_DIR, "agentic-os.
  * Bump SCHEMA_VERSION whenever tables are added — the cached connection
  * (surviving HMR via globalThis) re-runs the idempotent DDL on mismatch.
  */
-const SCHEMA_VERSION = 5
+const SCHEMA_VERSION = 6
 
 type GlobalWithDb = typeof globalThis & {
   __agenticOsDb?: Database.Database
@@ -31,6 +31,14 @@ type GlobalWithDb = typeof globalThis & {
 }
 
 const g = globalThis as GlobalWithDb
+
+/** Add a column to an existing table only if it isn't already present. */
+function ensureColumn(db: Database.Database, table: string, column: string, type: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
+  }
+}
 
 function initDb(): Database.Database {
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })
@@ -157,6 +165,7 @@ function initDb(): Database.Database {
       task_id INTEGER,
       payload TEXT,
       deliver_at INTEGER NOT NULL,
+      expires_at INTEGER,
       channels TEXT NOT NULL DEFAULT '{}',
       acked_at INTEGER,
       snoozed_until INTEGER,
@@ -180,6 +189,11 @@ function initDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_voice_latency_turn_at
       ON voice_latency (turn_at);
   `)
+
+  // Idempotent column adds for tables that predate a column. `CREATE TABLE IF
+  // NOT EXISTS` above never alters an existing table, so a column introduced in
+  // a later SCHEMA_VERSION must be back-filled here for already-created DBs.
+  ensureColumn(db, "notifications", "expires_at", "INTEGER")
 
   if (vecAvailable) {
     db.exec(`

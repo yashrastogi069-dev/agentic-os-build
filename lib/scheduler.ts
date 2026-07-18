@@ -2,6 +2,7 @@ import { getRawDb } from "@/lib/db"
 import { addEvent } from "@/lib/events"
 import { enqueueNotification, markChannelDelivered } from "@/lib/db/notifications"
 import { getTelegramSettings, sendTelegramMessage } from "@/lib/connectors/telegram"
+import { isQuietHours } from "@/lib/assist/calendar-notify"
 import type { Task, TaskRecurrence } from "@/lib/tasks"
 
 /**
@@ -98,7 +99,25 @@ function findDueTasks(now: number): Task[] {
 function markFired(task: Task, now: number): void {
   const db = getRawDb()
   if (task.recurrence) {
-    const nextRemindAt = task.remindAt ? nextOccurrence(task.remindAt, task.recurrence) : null
+    // Advance to the next occurrence, then FAST-FORWARD past every occurrence
+    // that is already in the past. Previously this advanced by exactly one
+    // step from the old remind_at: after a multi-day gap the new remind_at was
+    // still overdue, which both left the recurring reminder permanently wedged
+    // (last_fired_at > a past remind_at blocks it forever) and, on any path
+    // that revisits it, invited a burst of stale fires. Looping until the new
+    // remind_at is strictly in the future means only the single most-recent
+    // missed occurrence fires (this call) and the rest are silently skipped.
+    let nextRemindAt: number | null = null
+    if (task.remindAt) {
+      nextRemindAt = nextOccurrence(task.remindAt, task.recurrence)
+      // Bounded guard: even a decade of missed daily occurrences is < 4000
+      // iterations; the cap only exists so a bad clock can never spin forever.
+      let guard = 0
+      while (nextRemindAt <= now && guard < 100_000) {
+        nextRemindAt = nextOccurrence(nextRemindAt, task.recurrence)
+        guard++
+      }
+    }
     db.prepare(`UPDATE tasks SET last_fired_at = ?, remind_at = ?, updated_at = ? WHERE id = ?`).run(
       now,
       nextRemindAt,
@@ -106,6 +125,7 @@ function markFired(task: Task, now: number): void {
       task.id,
     )
   } else {
+    // One-shot reminder: unchanged — record the fire, never touch remind_at.
     db.prepare(`UPDATE tasks SET last_fired_at = ?, updated_at = ? WHERE id = ?`).run(now, now, task.id)
   }
 }
@@ -140,7 +160,11 @@ export async function runSchedulerTick(): Promise<void> {
         addEvent({ source: "reminder", title: `Reminder: ${task.title}` })
 
         try {
-          if (getTelegramSettings()) {
+          // Quiet hours (23:00-08:00 local): queue instead of buzzing the
+          // phone. The row stays pending and still shows in-app; the Telegram
+          // channel just isn't marked delivered this fire. Not a new mechanism
+          // — a single time check in front of the existing push.
+          if (getTelegramSettings() && !isQuietHours(now)) {
             await sendTelegramMessage(`Reminder: ${task.title}`)
             markChannelDelivered(notificationId, "telegram")
           }

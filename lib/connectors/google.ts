@@ -2,6 +2,7 @@ import { tool } from "ai"
 import { z } from "zod"
 import { addEvent } from "@/lib/events"
 import { getConnectorConfig } from "@/lib/settings"
+import { enqueueCalendarEventNotification } from "@/lib/assist/calendar-notify"
 import {
   buildAuthUrl,
   getAccessToken as oauthGetAccessToken,
@@ -263,6 +264,15 @@ export const googleTools = {
     }),
     execute: async ({ summary, description, startISO, endISO, location }) => {
       const result = await createCalendarEvent(summary, startISO, endISO, description, location)
+      // Give the event its own future reminder immediately at creation time, so
+      // it doesn't have to wait for the next catch-up sweep to be pre-enqueued.
+      // Same dedupe scheme, so the sweep never double-enqueues it. Best-effort:
+      // a notification failure must not fail the event the user just created.
+      try {
+        enqueueCalendarEventNotification({ id: result.id, title: summary, start: startISO })
+      } catch (error) {
+        console.error("[google] failed to enqueue calendar notification", error)
+      }
       return { created: true, ...result }
     },
   }),

@@ -15,6 +15,7 @@ export interface Notification {
   taskId: number | null
   payload: Record<string, unknown> | null
   deliverAt: number
+  expiresAt: number | null
   channels: Record<string, number>
   ackedAt: number | null
   snoozedUntil: number | null
@@ -30,6 +31,7 @@ type NotificationRow = {
   task_id: number | null
   payload: string | null
   deliver_at: number
+  expires_at: number | null
   channels: string
   acked_at: number | null
   snoozed_until: number | null
@@ -46,6 +48,7 @@ function rowToNotification(row: NotificationRow): Notification {
     taskId: row.task_id,
     payload: row.payload ? safeParse(row.payload) : null,
     deliverAt: row.deliver_at,
+    expiresAt: row.expires_at,
     channels: safeParse(row.channels) as Record<string, number>,
     ackedAt: row.acked_at,
     snoozedUntil: row.snoozed_until,
@@ -69,14 +72,16 @@ export function enqueueNotification(input: {
   taskId?: number
   payload?: Record<string, unknown>
   deliverAt: number
+  /** Optional hard expiry — an undelivered row past this is dropped, not shown stale. */
+  expiresAt?: number
 }): { id: number; created: boolean } {
   const db = getRawDb()
   const now = Date.now()
 
   const result = db
     .prepare(
-      `INSERT INTO notifications (kind, title, body, dedupe_key, task_id, payload, deliver_at, channels, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, '{}', ?)
+      `INSERT INTO notifications (kind, title, body, dedupe_key, task_id, payload, deliver_at, expires_at, channels, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?)
        ON CONFLICT(dedupe_key) DO NOTHING`,
     )
     .run(
@@ -87,6 +92,7 @@ export function enqueueNotification(input: {
       input.taskId ?? null,
       input.payload ? JSON.stringify(input.payload) : null,
       input.deliverAt,
+      input.expiresAt ?? null,
       now,
     )
 
@@ -110,10 +116,11 @@ export function listPendingNotifications(now: number): Notification[] {
       `SELECT * FROM notifications
        WHERE acked_at IS NULL
          AND deliver_at <= ?
+         AND (expires_at IS NULL OR expires_at > ?)
          AND (snoozed_until IS NULL OR snoozed_until <= ?)
        ORDER BY deliver_at ASC`,
     )
-    .all(now, now) as NotificationRow[]
+    .all(now, now, now) as NotificationRow[]
   return rows.map(rowToNotification)
 }
 

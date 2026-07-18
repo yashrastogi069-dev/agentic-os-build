@@ -7,6 +7,7 @@ import { getActiveProviderId, getProviderStatus } from "@/lib/providers"
 import { CONNECTORS, type ProbeResult } from "@/lib/connectors/registry"
 import { memoryStats } from "@/lib/memory"
 import { WHISPER_BIN } from "@/lib/voice/paths"
+import { sweepTriggers } from "@/lib/assist/sweep"
 
 export const dynamic = "force-dynamic"
 
@@ -33,6 +34,14 @@ export async function GET() {
   ])
 
   const probes = Object.fromEntries(connectorResults) as Record<string, ProbeResult>
+
+  // Reactive catch-up sweep (Phase 7 Chunk 4): the status bar already polls this
+  // route whenever a tab is open, so it doubles as the browser's session-start
+  // signal. Pass the probe results we just computed so connector-down detection
+  // reuses them instead of adding any new health check. sweepTriggers never
+  // throws (internal try/catch); on the common path (rate-gated, digest done)
+  // it does no network work and just reads/writes local state.
+  await sweepTriggers({ probes })
 
   let dbOk = false
   let stats = { total: 0, byCategory: {} as Record<string, number> }

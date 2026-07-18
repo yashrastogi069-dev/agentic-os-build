@@ -181,6 +181,14 @@ export const notifications = sqliteTable("notifications", {
   taskId: integer("task_id"),
   payload: text("payload", { mode: "json" }).$type<Record<string, unknown>>(),
   deliverAt: integer("deliver_at", { mode: "timestamp_ms" }).notNull(),
+  /**
+   * Optional hard expiry (Phase 7 Chunk 4). A calendar-soon row that was never
+   * delivered before this moment (e.g. the app was closed straight through the
+   * event) is silently dropped from every consumer instead of shown stale.
+   * null = never expires (reminders keep their existing "announce once on
+   * restart" behavior).
+   */
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
   channels: text("channels", { mode: "json" })
     .$type<Record<string, number>>()
     .notNull()

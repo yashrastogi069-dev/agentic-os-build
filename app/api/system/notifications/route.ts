@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { requireSystemAuth } from "@/lib/system-auth"
 import { runSchedulerTick } from "@/lib/scheduler"
+import { sweepTriggers } from "@/lib/assist/sweep"
 import {
   listPendingNotifications,
   markChannelDelivered,
@@ -23,8 +24,12 @@ export async function GET(request: Request) {
   if (denied) return denied
 
   try {
-    // Fire the reminder scheduler so anything now due is enqueued before we read.
+    // Fire the reminder scheduler so anything now due is enqueued before we read,
+    // then run the catch-up sweep (calendar-soon pre-enqueue + daily briefing).
+    // No probes on this path — connector-down detection rides the browser's
+    // /api/health poll, which does the actual health probing.
     await runSchedulerTick()
+    await sweepTriggers()
 
     const pending = listPendingNotifications(Date.now())
     const undelivered = pending.filter((n) => !n.channels.companion)
