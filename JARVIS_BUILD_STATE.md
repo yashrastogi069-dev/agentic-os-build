@@ -149,6 +149,25 @@ Windows toasts + ntfy.sh push, and F9 ask-Jarvis-anywhere. Chunks: 0
 repo adoption, 1 API surface, 2 companion completion, 3 ask-anywhere, 4
 proactive engine, 5 docs+closeout. Progress logged below as chunks land.
 
+- **Chunk 0 (repo adoption)**: SHIPPED 2026-07-18, commit `9c7ccd4`. Sonnet
+  executor (mechanical file-move, no Fable/Opus needed). Copied the
+  working standalone dictation tool's `dictate/` package + run scripts +
+  STT smoke-test harness from `Desktop/Whisper clone` into
+  `tools/dictate/`; skipped `.venv`/`__pycache__`/the real `config.json`
+  (gitignored, ships `config.example.json` with the same non-secret
+  defaults instead). `app/globals.css` gained `@source not "../tools";`
+  so Tailwind never scans the Python tree. Original Desktop copy left
+  untouched per the plan. Gates: typecheck clean (one pre-existing
+  unrelated `tests/oauth.test.ts` issue confirmed present before this
+  chunk via `git log`), build green, gitignore patterns confirmed to
+  actually match via `git check-ignore`. Also cleaned up a stray
+  `verify-tmp-intent.mjs` left on disk by the earlier interrupted Phase
+  6 verification agent (killed mid-run, never got to its own cleanup
+  step) before committing.
+- **Next**: Chunk 1 (`app/api/system/*` surface + dedicated system auth
+  token) — the security-sensitive one, Opus + a Fable advisory pass, per
+  Yash's "opus for the important ones" rule. Not yet dispatched.
+
 ### Phase 5 progress log (updated as chunks land, 2026-07-17)
 
 - **Chunk 5A-1/5A-2 (registry skeleton + agent.ts wiring)**: SHIPPED
