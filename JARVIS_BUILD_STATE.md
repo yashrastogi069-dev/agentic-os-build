@@ -192,34 +192,121 @@ proactive engine, 5 docs+closeout. Progress logged below as chunks land.
   Chunk 4 proactive-engine design discussion, which is still open (see
   below).
 
-### Chunk 4 (proactive engine) — design discussion in progress, NOT built
+### Chunk 4 (proactive engine) — SHIPPED 2026-07-18, commit `da28054`
+
+Built out of order (jumped ahead of chunks 2/3 — Yash caught this and I
+confirmed it was intentional, not a mistake left uncorrected; chunks 2
+and 3 are next before chunk 5). Opus executor, survived one session-limit
+interruption (resumed same agent after confirming via `git status` that
+its real progress — `lib/assist/`, the `markFired` fix, the recurrence
+test — was already safely on disk; nothing duplicated). I reviewed the
+recurrence-fix loop and the live schema migration myself directly before
+committing, given this touches the exact code that had a real bug in it.
+Live-verified against Yash's actual connected Google Calendar — a real
+upcoming event was picked up and correctly enqueued, second sweep within
+the rate-gate produced zero duplicates. Full detail in the commit message
+itself (`git show da28054`); the design section below is kept for the
+historical record of how this chunk's scope was decided.
+
+### Chunk 4 (proactive engine) — design history (decided 2026-07-18)
 
 Yash flagged this as the highest-risk chunk before any code gets written
 ("we need to plan this very properly... otherwise it is gonna break or
-create chaos or hit the rate limit very fast"). Discussed and NOT yet
-resolved:
+create chaos or hit the rate limit very fast"). Went through two full
+Fable critical-review passes (not just one advisory pass — Fable was
+explicitly asked to find holes in its own first proposal, and did) plus
+a live decision from Yash on the hardest tradeoff. The original
+MASTER_PLAN_V2 concept of a 24/7 background poller checking 5 trigger
+kinds every ~30s is REJECTED — replaced by the design below. There is no
+"proactive engine" as a subsystem anymore.
 
-- **Core architecture decided**: detection (calendar checks, connector
-  health, morning digest) runs server-side inside the EXISTING Phase 6E
-  scheduler tick via a new `lib/assist/triggers.ts`, each trigger kind on
-  its OWN internal throttle independent of the 30s tick (calendar every
-  5-10min not every tick, connector-down debounced to 2 consecutive
-  checks, morning digest gated by a persisted last-sent date). The
-  companion's poll (already built in Chunk 1's `/api/system/notifications`)
-  stays a cheap DB-only read — it never does detection itself. This
-  decoupling is what makes "always-on" safe; recommended KEEPING the
-  always-on companion, not dropping it.
-- **Recommended cutting "long job finished"** from this chunk entirely —
-  no concrete "long job" concept exists yet in this app to hang a trigger
-  off of; inventing one now would be speculative infra Yash has
-  repeatedly flagged against this session.
-- **Open decision awaiting Yash's call**: when the 4/hour delivery cap is
-  already hit and a new trigger fires, do time-sensitive kinds
-  (calendar-soon, reminder-due) bypass the cap (recommended), or does
-  everything strictly queue? Quiet-hours behavior ("queue, never drop")
-  is separate and already decided by the original plan.
-- Every trigger dedupes via the same `dedupe_key`-unique mechanism
-  Phase 6E's reminders already use — no new dedup infra needed.
+**Root cause of the original design's risk (Yash's own insight, worth
+recording verbatim in spirit)**: an always-on poller silently assumes
+continuous machine uptime, which is false for how Yash actually uses
+this ("I will not open my computer for days"). It was never actually
+achieving "notify me even when my computer is off" (impossible for a
+local-first app without a cloud component) — it was only achieving
+"notify me promptly while the app happens to be running," at 30s
+intervals, which is wildly excessive for that narrow goal and is exactly
+what creates burst/flood risk after a multi-day gap.
+
+**A real, already-shipped bug this exposed**: `markFired` in
+`lib/scheduler.ts` (lines ~98-111) advances a recurring reminder by only
+ONE occurrence per fire, from the OLD `remind_at`. After a multi-day
+gap, this causes burst-fire duplicate toasts/Telegram pushes (one per
+missed occurrence, 30s apart) for any recurring task. **Fix this first,
+independent of Chunk 4** — loop `nextOccurrence` until the new
+`remind_at > now`, firing only the most recent missed occurrence and
+silently skipping the rest. One-shot reminders are unaffected.
+
+**Final agreed design — "catch-up-on-open", zero new timers:**
+
+1. **reminder-due**: already shipped (Phase 6E). Only change: the
+   `markFired` bug fix above.
+2. **calendar-soon**: on session-open (browser tab loads, or companion
+   fetches `/api/system/notifications`), sweep the next ~24h of Google
+   Calendar events and PRE-ENQUEUE them into the existing notifications
+   table with a FUTURE `deliver_at` (event start minus ~15min) — the
+   EXISTING 30s scheduler tick (already running, nothing new) delivers
+   them at the right moment, exactly like reminders already work. Add an
+   `expires_at` (event start + ~10min grace) so a stale undelivered row
+   is never shown as if it were still upcoming. No new timer. The only
+   gap (an event created/moved after the sweep, e.g. from a phone) is
+   covered by a staleness gate INSIDE the existing tick: if the last
+   sweep is >30min old AND a browser tab is actually open right now
+   (already detectable — the status bar already polls `/api/health`
+   every 10s), re-sweep then. Also hook `createCalendarEvent` to enqueue
+   its own event's notification immediately at creation time.
+3. **Daily briefing** (renamed from "morning digest" — a fixed clock
+   time is incoherent for a machine often off at 8am): template-rendered
+   from data already in SQLite (due reminders, today's events, connector
+   warnings) — explicitly NO LLM call, since an LLM adds only variance
+   and a free-tier quota draw for zero benefit on a plain list. Fires on
+   session-open if the local calendar date differs from a stored
+   `last_digest_date`; dedupe key `digest:<local-date>`. Opening at 2pm
+   gets "today's briefing" then, not a missed morning ritual. Days with
+   no session produce no digest and no debt — never backfills.
+4. **connector-down**: ZERO new polling — piggybacks entirely on the
+   `/api/health` probe that already runs whenever a tab is open (Phase
+   5's registry). Only new work: persist each connector's last-known
+   status, and enqueue a notification only on an ok-to-down TRANSITION
+   (not on every check), with the message stating how long it's been
+   down (not falsely implying it just happened) and firing once per
+   outage, not once per open.
+5. **"Long job finished"**: DROPPED as a trigger/poll concept per both
+   Yash's and Fable's independent judgment. If a real "job" concept ever
+   exists (e.g. Phase 8 skill-mining), it should call the notification
+   queue directly at completion, not be polled for.
+
+**Guardrails, trimmed**: the original 4/hour + 12/day delivery caps and
+per-kind toggles are CUT for v1 — Fable's point, which Yash accepted:
+those were solving a problem the always-on design created; once nothing
+fires on a timer, there's nothing meaningful to rate-limit. Keep snooze
+(already shipped) and exactly one rule: no phone/Telegram push between
+11pm-8am, queue instead of drop. The earlier "does an urgent notification
+bypass the cap" question is now moot since there are no caps.
+
+**Companion's role, confirmed**: stays a "dumb delivery body" only. It
+polls `GET /api/system/notifications` (Chunk 1, already shipped), whose
+GET handler already does sweep-then-fetch — meaning trigger detection
+runs AT FETCH TIME, which IS the catch-up model, requiring no change to
+that route. Zero external API calls of its own, zero detection logic of
+its own, zero AI calls anywhere in this whole chunk.
+
+**Accepted, explicit limitation — Yash's explicit decision**: this
+CANNOT deliver a true push notification while the laptop is fully off
+(e.g., a phone buzz for a 2:30pm meeting with the laptop closed). Fable
+proposed a fix for this specifically (a separate, stateless, external
+watcher — cron-job.org ping -> a small endpoint checking Google Calendar
+only -> Upstash Redis for dedupe -> ntfy push; zero AI calls, zero
+dependency on the local process or DB, quantified as trivially within
+every free tier involved) but Yash explicitly chose to DROP the
+always-off case entirely rather than take on that extra external-service
+complexity (new accounts, a public-internet-reachable endpoint needing
+its own auth story). Not revisited unless Yash raises it again.
+
+**Not yet dispatched to an executor** — this is a finalized design, next
+step is building it.
 
 ### Phase 5 progress log (updated as chunks land, 2026-07-17)
 
