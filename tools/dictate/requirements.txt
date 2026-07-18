@@ -2,3 +2,5 @@ sounddevice
 faster-whisper
 pynput
 pyperclip
+pystray
+Pillow

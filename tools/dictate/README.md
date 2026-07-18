@@ -18,8 +18,24 @@ no audio ever leaves the machine. Adopted from the standalone prototype at
 
 ## Current state
 
-This runs today as a standalone tool, exactly as it did in the original
-prototype — LLM cleanup is a pass-through stub (`dictate/cleanup.py`), off by
-default. Later Phase 7 chunks wire this into Jarvis proper via the
-`app/api/system/*` route surface (cleanup, observe, command, notifications);
-that wiring is not part of this chunk.
+This runs as a standalone tool by default (works fully with Jarvis switched
+off) but now talks to Jarvis's local `app/api/system/*` surface when
+`jarvis_url`/`jarvis_token` are set in `config.json`:
+
+- **Cleanup** (`dictate/cleanup.py`, opt-in via `llm_cleanup_enabled`): posts
+  the raw transcript to `POST {jarvis_url}/api/system/cleanup` for
+  punctuation/casing/filler cleanup, and pastes the cleaned text instead.
+- **Observe** (`dictate/main.py` + `dictate/winfocus.py`): a best-effort,
+  fire-and-forget `POST {jarvis_url}/api/system/observe` with the transcript
+  and the foreground window title/process captured at the moment recording
+  started, so Jarvis's feed knows what you were dictating into.
+- **Tray icon** (`dictate/tray.py`, requires `pystray` + `Pillow`): a minimal
+  system tray icon confirms the tool is running, with a right-click Quit that
+  stops the hotkey listener and exits cleanly.
+
+Both HTTP calls fail open: if Jarvis isn't running, the token is wrong, the
+call times out, or `jarvis_url`/`jarvis_token` are simply unset, dictation
+still works with the raw transcript — cleanup/observe never block or break
+the paste. `dictate/jarvis_client.py` holds the shared request/fallback logic.
+`app/api/command`/notifications wiring (ask-Jarvis-anywhere, proactive
+toasts) is later Phase 7 chunks, not part of this one.

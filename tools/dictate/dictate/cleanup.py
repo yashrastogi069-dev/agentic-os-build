@@ -1,14 +1,27 @@
-"""LLM cleanup stage — NOT built yet, by design (slow laptop, see RUN_STATE.md).
+"""LLM cleanup stage -- POSTs the dictated transcript to Jarvis's
+`/api/system/cleanup` for punctuation/casing/filler-word cleanup (see
+app/api/system/cleanup/route.ts).
 
-When llm_cleanup_enabled is flipped to true in config.json, the Ollama-based
-clean() from PLAN.md section 3 drops in here (editor system prompt, temperature
-0.2, backtick-delimited input, output-length guard). Until then this is a
-pass-through and no Ollama install is needed.
+Only called when llm_cleanup_enabled is true in config.json (default False;
+this stage adds a network round trip to the dictation path, so it stays
+opt-in). Falls open to the original, uncleaned transcript whenever Jarvis
+can't help: not running, timeout, non-200/bad JSON, or jarvis_url/
+jarvis_token not configured yet in config.json. The dictation flow must never
+block or fail just because cleanup is unavailable.
 """
+
+from .jarvis_client import post_json
 
 
 def maybe_clean(transcript: str, cfg: dict) -> str:
     if not cfg.get("llm_cleanup_enabled", False):
         return transcript
-    print("[cleanup] llm_cleanup_enabled is true but the LLM stage isn't built yet; passing text through")
-    return transcript
+
+    body = post_json(cfg, "/api/system/cleanup", {"text": transcript})
+    if not body:
+        return transcript
+
+    cleaned = body.get("text")
+    if not isinstance(cleaned, str) or not cleaned.strip():
+        return transcript
+    return cleaned

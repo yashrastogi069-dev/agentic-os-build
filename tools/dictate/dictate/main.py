@@ -9,7 +9,9 @@ from .audio import SAMPLE_RATE, Recorder
 from .cleanup import maybe_clean
 from .config import load_config
 from .inject import inject_text
+from .jarvis_client import post_json
 from .stt import Transcriber
+from .winfocus import get_foreground_window_info
 
 
 def resolve_key(name: str):
@@ -20,6 +22,18 @@ def resolve_key(name: str):
         return getattr(keyboard.Key, name)
     except AttributeError:
         raise SystemExit(f"Unknown hotkey '{name}' in config.json (try ctrl_r, f8, pause...)")
+
+
+def send_observation(cfg: dict, text: str, window_title: str, app: str):
+    """Best-effort, fire-and-forget: tell Jarvis what got dictated and where.
+    Runs on its own daemon thread so a slow/unreachable Jarvis never delays
+    the next dictation. Failure is silent beyond jarvis_client's own log line
+    (see app/api/system/observe/route.ts for the body shape this matches)."""
+    post_json(
+        cfg,
+        "/api/system/observe",
+        {"kind": "transcript", "text": text, "windowTitle": window_title, "app": app},
+    )
 
 
 def main():
@@ -61,6 +75,7 @@ def main():
 
     def worker():
         rec = Recorder(on_level=overlay.set_level if overlay else None)
+        window_title, window_app = "", ""
         while True:
             ev = events.get()
             if ev == "start":
@@ -69,6 +84,9 @@ def main():
                 except Exception as e:
                     print(f"! mic error: {e}")
                     continue
+                # Capture what's focused right now, before recording shifts
+                # anything -- this is the "observe" side-channel context.
+                window_title, window_app = get_foreground_window_info()
                 set_state("recording")
                 winsound.Beep(880, 80)
                 print("\n* recording... (release to transcribe)", flush=True)
@@ -78,11 +96,17 @@ def main():
                 winsound.Beep(440, 80)
                 secs = audio.size / SAMPLE_RATE
                 t = time.time()
-                text = maybe_clean(transcriber.transcribe(audio), cfg)
+                raw_text = transcriber.transcribe(audio)
+                text = maybe_clean(raw_text, cfg)
                 took = time.time() - t
                 if text:
                     inject_text(text, cfg)
                     print(f"  {secs:.1f}s audio -> transcribed in {took:.1f}s: {text}")
+                    threading.Thread(
+                        target=send_observation,
+                        args=(cfg, raw_text, window_title, window_app),
+                        daemon=True,
+                    ).start()
                 else:
                     print(f"  (nothing heard in {secs:.1f}s of audio)")
                 set_state("idle")
@@ -90,6 +114,21 @@ def main():
     threading.Thread(target=worker, daemon=True).start()
     listener = keyboard.Listener(on_press=on_press, on_release=on_release)
     listener.start()
+
+    def quit_app():
+        print("\nQuitting (tray)...")
+        listener.stop()
+        if overlay is not None:
+            try:
+                overlay.root.quit()
+            except Exception:
+                pass
+
+    try:
+        from .tray import start_tray
+        start_tray(on_quit=quit_app)
+    except Exception as e:
+        print(f"! tray icon unavailable ({e}); Ctrl+C here to quit instead")
 
     if overlay is not None:
         try:
