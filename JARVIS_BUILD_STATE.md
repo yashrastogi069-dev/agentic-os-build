@@ -164,9 +164,62 @@ proactive engine, 5 docs+closeout. Progress logged below as chunks land.
   `verify-tmp-intent.mjs` left on disk by the earlier interrupted Phase
   6 verification agent (killed mid-run, never got to its own cleanup
   step) before committing.
-- **Next**: Chunk 1 (`app/api/system/*` surface + dedicated system auth
-  token) — the security-sensitive one, Opus + a Fable advisory pass, per
-  Yash's "opus for the important ones" rule. Not yet dispatched.
+- **Chunk 1 (`app/api/system/*` surface + system auth token)**: SHIPPED
+  2026-07-18, commit `ed9c230`. Fable design pass first (found a real,
+  concrete prompt-injection vector: attacker-controlled window titles
+  reaching the agent as if they were instructions; specified the fix),
+  then an Opus executor implemented it. I reviewed the implementation
+  myself directly (read every new/changed security file against the
+  design spec) rather than dispatching a separate review agent, since
+  the file set was small and bounded. New: `lib/system-auth.ts`
+  (rate-limit-first auth guard, single-boolean concurrency cap on
+  `/command`), `getSystemToken`/`regenerateSystemToken`/
+  `verifySystemToken` in `lib/settings.ts` (cloned from the existing
+  MCP-key pattern, auto-generates so there's never a null-token open-auth
+  window), four routes (`/cleanup` text-editing-only pass-through-on-
+  failure, `/observe` templated-title injection mitigation + deliberately
+  no memory-write, `/command` real 502 on failure via new
+  `collectOsAgentResponse()`, `/notifications` GET/POST mirroring the
+  existing SSE channel-delivery pattern). Gates: typecheck/build/test
+  green, live-verified auth/rate-limit/concurrency-guard/injection-
+  mitigation behavior. Honest gap: the executor's sandbox couldn't
+  reach any AI provider (confirmed environmental, matches pre-existing
+  `/api/chat` behavior there), so `/command`'s success path and
+  `/cleanup`'s `cleaned:true` path weren't live-exercised — worth a
+  real end-to-end check once Chunk 2 wires up the actual Python client.
+- **Paused here 2026-07-18 per Yash's explicit instruction** ("wait
+  after completing chunk 1") — holding before Chunk 2 and before the
+  Chunk 4 proactive-engine design discussion, which is still open (see
+  below).
+
+### Chunk 4 (proactive engine) — design discussion in progress, NOT built
+
+Yash flagged this as the highest-risk chunk before any code gets written
+("we need to plan this very properly... otherwise it is gonna break or
+create chaos or hit the rate limit very fast"). Discussed and NOT yet
+resolved:
+
+- **Core architecture decided**: detection (calendar checks, connector
+  health, morning digest) runs server-side inside the EXISTING Phase 6E
+  scheduler tick via a new `lib/assist/triggers.ts`, each trigger kind on
+  its OWN internal throttle independent of the 30s tick (calendar every
+  5-10min not every tick, connector-down debounced to 2 consecutive
+  checks, morning digest gated by a persisted last-sent date). The
+  companion's poll (already built in Chunk 1's `/api/system/notifications`)
+  stays a cheap DB-only read — it never does detection itself. This
+  decoupling is what makes "always-on" safe; recommended KEEPING the
+  always-on companion, not dropping it.
+- **Recommended cutting "long job finished"** from this chunk entirely —
+  no concrete "long job" concept exists yet in this app to hang a trigger
+  off of; inventing one now would be speculative infra Yash has
+  repeatedly flagged against this session.
+- **Open decision awaiting Yash's call**: when the 4/hour delivery cap is
+  already hit and a new trigger fires, do time-sensitive kinds
+  (calendar-soon, reminder-due) bypass the cap (recommended), or does
+  everything strictly queue? Quiet-hours behavior ("queue, never drop")
+  is separate and already decided by the original plan.
+- Every trigger dedupes via the same `dedupe_key`-unique mechanism
+  Phase 6E's reminders already use — no new dedup infra needed.
 
 ### Phase 5 progress log (updated as chunks land, 2026-07-17)
 
