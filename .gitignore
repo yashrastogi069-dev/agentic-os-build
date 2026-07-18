@@ -26,3 +26,8 @@ models/
 # Phase 6 voice sidecar local env
 tools/stt-server/.venv/
 tools/**/__pycache__/
+
+# Phase 7 dictation companion local env (real config holds no secrets today,
+# but keep it out of git anyway — it's a machine-local settings file)
+tools/dictate/.venv/
+tools/dictate/config.json
