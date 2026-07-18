@@ -78,6 +78,7 @@ export function SettingsPanel() {
   const [googleClientSecret, setGoogleClientSecret] = useState('')
   const [appleId, setAppleId] = useState('')
   const [applePassword, setApplePassword] = useState('')
+  const [editingApple, setEditingApple] = useState(false)
   const [showMcpKey, setShowMcpKey] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -390,10 +391,15 @@ export function SettingsPanel() {
         <PanelSectionHeading as="h3" className="mb-2">
           apple calendar (icloud)
         </PanelSectionHeading>
-        {data.apple.configured ? (
-          <p className="font-mono text-xs text-primary">
-            configured as {data.apple.appleId}
-          </p>
+        {data.apple.configured && !editingApple ? (
+          <div className="flex items-center gap-2">
+            <p className="font-mono text-xs text-primary">
+              configured as {data.apple.appleId}
+            </p>
+            <GhostButton size="xs" onClick={() => setEditingApple(true)}>
+              change password
+            </GhostButton>
+          </div>
         ) : (
           <form
             className="space-y-2"
@@ -407,6 +413,7 @@ export function SettingsPanel() {
               })
               setAppleId('')
               setApplePassword('')
+              setEditingApple(false)
               setStatusLine('apple calendar saved — sync feeds to pull events')
             }}
           >
@@ -426,6 +433,18 @@ export function SettingsPanel() {
                 aria-label="Apple app-specific password"
               />
               <AccentButton type="submit">save</AccentButton>
+              {data.apple.configured && (
+                <GhostButton
+                  size="xs"
+                  onClick={() => {
+                    setEditingApple(false)
+                    setAppleId('')
+                    setApplePassword('')
+                  }}
+                >
+                  cancel
+                </GhostButton>
+              )}
             </div>
             <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
               generate an app-specific password at appleid.apple.com → security
