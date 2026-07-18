@@ -6,6 +6,7 @@ CONFIG_PATH = PROJECT_ROOT / "config.json"
 
 DEFAULTS = {
     "hotkey": "ctrl_r",
+    "ask_hotkey": "f8",
     "model": "base",
     "language": "en",
     "compute_type": "int8",
